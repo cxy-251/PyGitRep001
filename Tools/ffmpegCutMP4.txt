@@ -1,0 +1,108 @@
+ffmpeg -i input.mp4 -ss 0 -t 3600 -c copy clip1.mp4
+ffmpeg -i input.mp4 -ss 3600 -c copy clip2.mp4
+
+在pytorch里安装了ffmpeg-python，其实没有必要
+直接在终端运行上两行代码就好了
+
+反而在python里面会报错
+import ffmpeg
+
+# open the video file using ffmpeg
+video = ffmpeg.input('path/to/video.mp4')
+
+# split the video into two 1.5G clips
+(
+    video
+    .output('clip1.mp4', ss=0, t=3600, map='0')
+    .output('clip2.mp4', ss=3600, map='0')
+    .run()
+)
+
+
+
+这是一个意外收获
+要使用 Python 将大视频拆分为较小的剪辑，您可以使用 'pytube库下载视频，然后使用ffmpeg将其拆分为较小的剪辑。
+# install the required libraries
+!pip install pytube
+!pip install ffmpeg
+
+# import the necessary libraries
+from pytube import YouTube
+import ffmpeg
+
+# download the video using pytube
+yt = YouTube("https://www.youtube.com/watch?v=XXXXXXXXXXX")
+video = yt.streams.first().download()
+
+# use ffmpeg to split the video into two 1.5G clips
+(
+    ffmpeg
+    .input(video)
+    .output('clip1.mp4', ss=0, t=3600, map='0')
+    .output('clip2.mp4', ss=3600, map='0')
+    .run()
+)
+
+
+
+
+
+
+自己看吧，反正我粘贴过来的时候还没看
+
+There are several ways you can trim a video in Python. Here are a few options:
+
+Using OpenCV: OpenCV is a powerful library for image and video processing, and it can be used to trim videos as well. Here is an example of how you can trim a video using OpenCV:
+import cv2
+
+# Open the video file
+video = cv2.VideoCapture("video.mp4")
+
+# Get the frame rate of the video
+fps = video.get(cv2.CAP_PROP_FPS)
+
+# Set the start and end time for the trim
+start_time = 10.0 # start at the 10th second
+end_time = 20.0 # end at the 20th second
+
+# Calculate the start and end frame numbers
+start_frame = int(start_time * fps)
+end_frame = int(end_time * fps)
+
+# Create a new video writer for the output video
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+output_video = cv2.VideoWriter("trimmed_video.mp4", fourcc, fps, (int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))))
+
+# Loop through the frames and write the ones within the specified range
+for i in range(start_frame, end_frame):
+    _, frame = video.read()
+    output_video.write(frame)
+
+# Release the video and writer objects
+video.release()
+output_video.release()
+Using moviepy: moviepy is a Python library for video editing that makes it easy to trim videos. Here is an example of how you can use moviepy to trim a video:
+from moviepy.editor import VideoFileClip
+
+# Set the start and end time for the trim
+start_time = 10.0 # start at the 10th second
+end_time = 20.0 # end at the 20th second
+
+# Load the video
+clip = VideoFileClip("video.mp4")
+
+# Trim the video
+trimmed_clip = clip.subclip(start_time, end_time)
+
+# Save the trimmed video
+trimmed_clip.write_videofile("trimmed_video.mp4")
+Using ffmpeg: ffmpeg is a command-line tool for handling video and audio files, and it can be used to trim videos as well. Here is an example of how you can use ffmpeg to trim a video:
+import subprocess
+
+# Set the start and end time for the trim
+start_time = 10.0 # start at the 10th second
+end_time = 20.0 # end at the 20th second
+
+# Run the ffmpeg command to trim the video
+subprocess.run(["ffmpeg", "-i", "video.mp4", "-ss", str(start_time), "-to", str(end_time), "trimmed_video.mp4"])
+
