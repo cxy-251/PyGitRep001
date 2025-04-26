@@ -1,0 +1,16 @@
+
+{
+    "max_retries": 5,
+    "max_concurrent_downloads": 1,
+    "download_path": "D:/YouTubeVideos",
+    "max_disk_space_gb": 20,
+    "limit_rate": "unlimited",
+    "cookies_file": "cookies.txt",
+    "sleep_interval": [5, 10],
+    "error_codes": {
+        "404": "视频未找到，跳过",
+        "403": "没有权限，跳过",
+        "timeout": "超时，稍后重试",
+        "disk_full": "磁盘不足"
+    }
+}
