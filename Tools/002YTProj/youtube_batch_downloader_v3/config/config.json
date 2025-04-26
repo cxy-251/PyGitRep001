@@ -1,0 +1,11 @@
+
+{
+    "channel_list_file": "C:/02Programmer/02Proj/PyVSCode/ConfigPrivate/Rep001Tools002YTProjV3/channels.txt",
+    "max_disk_space_gb": 20,
+    "download_path": "G:/YTDowmLoad/YT-dlp",
+    "limit_rate": "unlimited",
+    "cookies_file": "C:/02Programmer/02Proj/PyVSCode/ConfigPrivate/Rep001Tools002YTProjV3/cookies.txt",
+    "sleep_interval": [5, 10],
+    "cache_dir": "C:/02Programmer/02Proj/PyVSCode/ConfigPrivate/Rep001Tools002YTProjV3/cache",
+    "log_dir": "C:/02Programmer/02Proj/PyVSCode/ConfigPrivate/Rep001Tools002YTProjV3/logs"
+}
