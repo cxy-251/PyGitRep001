@@ -6,6 +6,7 @@ import time
 import random
 import shutil
 from pathlib import Path
+import browser_cookie3
 from urllib.parse import urlparse
 from utils.disk_checker import check_disk_space
 from utils.stats_collector import StatsCollector
@@ -34,8 +35,12 @@ class Downloader:
             for vid in video_ids:
                 if not check_disk_space(self.config.data["max_disk_space_gb"], self.logger):
                     return
-                self.download_video(vid, folder_name)
+                res = self.download_video(vid, folder_name)
                 time.sleep(random.uniform(*self.config.data["sleep_interval"]))
+                while not res:
+                    self.logger.warning(f"下载失败，重试：{vid}")
+                    res = self.download_video(vid, folder_name)
+                    time.sleep(random.uniform(*self.config.data["sleep_interval"]))
         self.logger.info("任务完成")
         self.logger.info(self.stats.summary())
 
@@ -58,7 +63,7 @@ class Downloader:
             self.logger.error(f"获取视频失败：{e}")
             return []
 # yt-dlp -f bestvideo+bestaudio --merge-output-format mp4 -o "%(upload_date)s - %(title)s.%(ext)s" --download-archive 000downloaded.txt https://www.youtube.com/@ssunbiki
-    def download_video(self, url, folder_name):
+    def download_video(self, url, folder_name) -> bool:
         target_dir = os.path.join(self.config.data["download_path"], folder_name)
         os.makedirs(target_dir, exist_ok=True)
         archive_path = os.path.join(target_dir, "000downloaded.txt")
@@ -82,6 +87,37 @@ class Downloader:
             subprocess.run(cmd, check=True)
             self.logger.info(f"下载成功: {url}")
             self.stats.success += 1
+            return True
         except subprocess.CalledProcessError:
             self.logger.warning(f"下载失败（跳过）: {url}")
             self.stats.fail += 1
+        # wait_for_user_action():
+            # while True:
+            #     choice = input("处理失败，请修复 cookies 后输入是否继续？(y/n): ").strip().lower()
+            #     if choice == 'y':
+            #         print("继续执行程序...")
+            #         break
+            #     elif choice == 'n':
+            #         print("你自己按ctrl+c退出程序。")
+            #     else:
+            #         print("无效输入，请输入 y 或 n。")
+            # # （继续循环或重试）
+            # return False
+        # get cookies from browser
+            # 从 Firefox 获取 cookies
+            cookies = browser_cookie3.firefox(domain_name='youtube.com')
+
+            # 格式化为 Netscape 格式（yt-dlp 支持的格式）
+            cookies_txt_path = self.config.data["cookies_file"]
+
+            with open(cookies_txt_path, 'w', encoding='utf-8') as f:
+                f.write("# Netscape HTTP Cookie File\n")
+                for cookie in cookies:
+                    domain = cookie.domain if cookie.domain.startswith('.') else '.' + cookie.domain
+                    path = cookie.path or '/'
+                    secure = "TRUE" if cookie.secure else "FALSE"
+                    expires = int(time.time()) + 3600 * 24 * 30  # 设置过期时间为 30 天
+                    f.write(f"{domain}\tTRUE\t{path}\t{secure}\t{expires}\t{cookie.name}\t{cookie.value}\n")
+
+            self.logger.warning(f"✅ Cookies 已提取并保存到 {cookies_txt_path}")
+            return False
