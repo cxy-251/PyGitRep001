@@ -4,6 +4,7 @@ from core.downloader import Downloader
 from utils.logger import setup_logger
 from utils.config_loader import ConfigLoader
 from utils.cache_cleaner import clean_cache
+from utils.reget_cookies import reget_cookies
 
 if __name__ == "__main__":
     # 临时加载 config，获取 log_dir
@@ -17,5 +18,6 @@ if __name__ == "__main__":
     config = ConfigLoader("config/config.json", logger)
     clean_cache(cache_dir, logger)
 
+    reget_cookies(config, logger)
     downloader = Downloader(config, logger)
     downloader.run()

@@ -4,9 +4,6 @@ import subprocess
 import json
 import time
 import random
-import shutil
-from pathlib import Path
-import browser_cookie3
 from urllib.parse import urlparse
 from utils.disk_checker import check_disk_space
 from utils.stats_collector import StatsCollector
@@ -97,7 +94,7 @@ class Downloader:
             cmd += ["--cookies", self.config.data["cookies_file"]]
         if self.config.data.get("limit_rate") != "unlimited":
             cmd += ["--limit-rate", self.config.data["limit_rate"]]
-        cmd2 = cmd
+        cmd2 = cmd.copy()
         cmd += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
         try:
             subprocess.run(cmd, check=True)
@@ -105,7 +102,8 @@ class Downloader:
             self.stats.success += 1
             return True
         except subprocess.CalledProcessError as e:
-            if b"DRM" in e.stderr or b"Protected" in e.stderr:
+            stderr = e.stderr or b""
+            if b"DRM" in e.stderr or b"Protected" in stderr:
                 self.logger.warning(f"检测到DRM保护，使用安全格式重试...: {url}")
                 cmd2 += ["-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best", "--merge-output-format", "mp4"]
                 self.use_safty_cmd_DRM += 1
