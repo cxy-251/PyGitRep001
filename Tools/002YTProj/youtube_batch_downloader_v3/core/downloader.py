@@ -10,13 +10,19 @@ import browser_cookie3
 from urllib.parse import urlparse
 from utils.disk_checker import check_disk_space
 from utils.stats_collector import StatsCollector
+from utils.reget_cookies import reget_cookies
 from utils.file_namer import resolve_filename_conflict
 
+RETRY_LIMITS = 3
 class Downloader:
     def __init__(self, config, logger):
         self.config = config
         self.logger = logger
         self.stats = StatsCollector()
+        self.reget_cookies_nums = 0
+        self.retry_reget_cookies_times = 0
+        self.use_safty_cmd_DRM = 0
+        self.cant_deal_DRM = False
 
     def run(self):
         channels = self.load_channels(self.config.data.get("channel_list_file", "channels.txt"))
@@ -38,8 +44,17 @@ class Downloader:
                 res = self.download_video(vid, folder_name)
                 time.sleep(random.uniform(*self.config.data["sleep_interval"]))
                 while not res:
-                    self.logger.warning(f"下载失败，重试：{vid}")
+                    if self.retry_reget_cookies_times >= RETRY_LIMITS or self.cant_deal_DRM:
+                        self.logger.warning(f"达到最大重试次数3，跳过下载: {vid}")
+                        self.retry_reget_cookies_times = 0
+                        self.cant_deal_DRM = False
+                        break
+                    self.reget_cookies_nums += 1
+                    reget_cookies(self.config, self.logger)
+                    self.logger.warning(f"下载失败，（重新获取cookies重试）:{vid}， 重新获取cookies次数{self.reget_cookies_nums}")
                     res = self.download_video(vid, folder_name)
+                    if not res:
+                        self.retry_reget_cookies_times += 1
                     time.sleep(random.uniform(*self.config.data["sleep_interval"]))
         self.logger.info("任务完成")
         self.logger.info(self.stats.summary())
@@ -71,7 +86,6 @@ class Downloader:
         # final_path = resolve_filename_conflict(out_template)
         final_path = out_template
         cmd = ["yt-dlp", url, "--output", final_path, "--cache-dir", self.config.data["cache_dir"]]
-        cmd += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
         cmd += ["--download-archive", archive_path]
 
         cmd += [
@@ -83,13 +97,30 @@ class Downloader:
             cmd += ["--cookies", self.config.data["cookies_file"]]
         if self.config.data.get("limit_rate") != "unlimited":
             cmd += ["--limit-rate", self.config.data["limit_rate"]]
+        cmd2 = cmd
+        cmd += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
         try:
             subprocess.run(cmd, check=True)
             self.logger.info(f"下载成功: {url}")
             self.stats.success += 1
             return True
-        except subprocess.CalledProcessError:
-            self.logger.warning(f"下载失败（跳过）: {url}")
+        except subprocess.CalledProcessError as e:
+            if b"DRM" in e.stderr or b"Protected" in e.stderr:
+                self.logger.warning(f"检测到DRM保护，使用安全格式重试...: {url}")
+                cmd2 += ["-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best", "--merge-output-format", "mp4"]
+                self.use_safty_cmd_DRM += 1
+                try:
+                    subprocess.run(cmd2, check=True)
+                    self.logger.info(f"使用安全格式下载成功: {url}，遇到DRM保护，但是下载成功的次数：{self.use_safty_cmd_DRM}")
+                    self.stats.success += 1
+                    return True
+                except subprocess.CalledProcessError:
+                    self.logger.warning(f"使用安全格式重试仍然失败: {url}")
+                    self.stats.fail += 1
+                    self.cant_deal_DRM = True
+                    return False
+
+            self.logger.warning(f"下载失败: {url}")
             self.stats.fail += 1
         # wait_for_user_action():
             # while True:
@@ -105,19 +136,19 @@ class Downloader:
             # return False
         # get cookies from browser
             # 从 Firefox 获取 cookies
-            cookies = browser_cookie3.firefox(domain_name='youtube.com')
+            # cookies = browser_cookie3.firefox(domain_name='youtube.com')
 
-            # 格式化为 Netscape 格式（yt-dlp 支持的格式）
-            cookies_txt_path = self.config.data["cookies_file"]
+            # # 格式化为 Netscape 格式（yt-dlp 支持的格式）
+            # cookies_txt_path = self.config.data["cookies_file"]
 
-            with open(cookies_txt_path, 'w', encoding='utf-8') as f:
-                f.write("# Netscape HTTP Cookie File\n")
-                for cookie in cookies:
-                    domain = cookie.domain if cookie.domain.startswith('.') else '.' + cookie.domain
-                    path = cookie.path or '/'
-                    secure = "TRUE" if cookie.secure else "FALSE"
-                    expires = int(time.time()) + 3600 * 24 * 30  # 设置过期时间为 30 天
-                    f.write(f"{domain}\tTRUE\t{path}\t{secure}\t{expires}\t{cookie.name}\t{cookie.value}\n")
+            # with open(cookies_txt_path, 'w', encoding='utf-8') as f:
+            #     f.write("# Netscape HTTP Cookie File\n")
+            #     for cookie in cookies:
+            #         domain = cookie.domain if cookie.domain.startswith('.') else '.' + cookie.domain
+            #         path = cookie.path or '/'
+            #         secure = "TRUE" if cookie.secure else "FALSE"
+            #         expires = int(time.time()) + 3600 * 24 * 30  # 设置过期时间为 30 天
+            #         f.write(f"{domain}\tTRUE\t{path}\t{secure}\t{expires}\t{cookie.name}\t{cookie.value}\n")
 
-            self.logger.warning(f"✅ Cookies 已提取并保存到 {cookies_txt_path}")
+            # self.logger.warning(f"✅ Cookies 已提取并保存到 {cookies_txt_path}")
             return False
