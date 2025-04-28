@@ -97,7 +97,7 @@ class Downloader:
         cmd2 = cmd.copy()
         cmd += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
         try:
-            subprocess.run(cmd, check=True)
+            subprocess.run(cmd, check=True, capture_output=True)
             self.logger.info(f"下载成功: {url}")
             self.stats.success += 1
             return True
