@@ -1,5 +1,6 @@
 
 import os
+import shutil
 import subprocess
 import json
 import time
@@ -53,6 +54,7 @@ class Downloader:
                     if not res:
                         self.retry_reget_cookies_times += 1
                     time.sleep(random.uniform(*self.config.data["sleep_interval"]))
+                # TODO::shutilMoveVideoByWxH(folder_name/ABC/WxH)
         self.logger.info("任务完成")
         self.logger.info(self.stats.summary())
 
@@ -63,6 +65,15 @@ class Downloader:
         with open(path, encoding="utf-8") as f:
             return [line.strip() for line in f if line.strip()]
 
+    def is_file_in_use(file_path):
+        """检查文件是否正在被使用"""
+        try:
+            with open(file_path, "rb") as f:
+                pass  # 能正常打开文件，说明没有被占用
+            return False
+        except IOError:
+            return True  # 文件正在被占用
+    
     def get_video_ids(self, channel_url):
         cmd = ["yt-dlp", "--flat-playlist", "-J", channel_url]
         if self.config.data.get("cookies_file"):
@@ -94,12 +105,51 @@ class Downloader:
             cmd += ["--cookies", self.config.data["cookies_file"]]
         if self.config.data.get("limit_rate") != "unlimited":
             cmd += ["--limit-rate", self.config.data["limit_rate"]]
+
+        # 获取文件名
+        cmd_check_filename = cmd + ["--print", "filename"]
+        result = subprocess.run(cmd_check_filename, capture_output=True, text=True)
+        filename = result.stdout.strip()
+
         cmd2 = cmd.copy()
         cmd += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
         try:
             subprocess.run(cmd, check=True, capture_output=True)
             self.logger.info(f"下载成功: {url}")
             self.stats.success += 1
+
+            needBeMovedFilepath = os.path.join(target_dir, filename)
+            # 检查文件是否正在被使用
+            if is_file_in_use(needBeMovedFilepath):
+                self.logger.info(f"移动文件跳过（文件正在使用）{filename}")
+
+            # 获取视频分辨率，限制 5 秒超时
+            cmd_resolution = [
+                "ffprobe", "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=width,height", "-of", "csv=p=0", needBeMovedFilepath
+            ]
+            try:
+                result = subprocess.run(cmd_resolution, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
+                width, height = map(int, result.stdout.strip().split(","))
+
+                # 在当前子文件夹中创建ABC文件夹
+                abc_folder = os.path.join(folder_name, 'ABC')
+                os.makedirs(abc_folder, exist_ok=True)
+
+                # 创建分辨率文件夹并放入ABC子文件夹中
+                resolution_folder = os.path.join(abc_folder, f"{width}x{height}")
+                os.makedirs(resolution_folder, exist_ok=True)
+
+                # 移动文件到目标文件夹
+                shutil.move(needBeMovedFilepath, os.path.join(resolution_folder, filename))
+                # print(f"已移动: {filename} → {resolution_folder}/")
+
+            except subprocess.TimeoutExpired:
+                print(f"跳过（FFprobe 超时）: {filename}")
+
+            except ValueError:
+                print(f"跳过（无法获取分辨率）: {filename}")
+
             return True
         except subprocess.CalledProcessError as e:
             stderr = e.stderr or b""
