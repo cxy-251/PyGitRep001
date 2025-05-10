@@ -1,6 +1,7 @@
 
 import os
 import shutil
+import msvcrt
 import subprocess
 import json
 import time
@@ -25,10 +26,10 @@ class Downloader:
     def run(self):
         channels = self.load_channels(self.config.data.get("channel_list_file", "channels.txt"))
         for channel in channels:
-            self.logger.info(f"开始处理频道：{channel}")
-            folder_name = urlparse(channel).path.strip("/")
+            self.logger.info(f"开始处理频道: {channel}")
+            folder_name = urlparse(channel).path.strip("/") or "load_channel_failed"
             if folder_name.startswith("_"):
-                self.logger.info(f"_开头的频道，跳过：{channel}")
+                self.logger.info(f"_开头的频道, 跳过: {channel}")
                 continue
             video_ids = self.get_video_ids(channel)
 
@@ -38,18 +39,20 @@ class Downloader:
 
             for vid in video_ids:
                 if not check_disk_space(self.config.data["max_disk_space_gb"], self.logger):
+                    self.logger.warning("磁盘空间不足, 任务中止")
+                    # self.logger.info(self.stats.summary())
                     return
                 res = self.download_video(vid, folder_name)
                 time.sleep(random.uniform(*self.config.data["sleep_interval"]))
                 while not res:
                     if self.retry_reget_cookies_times >= RETRY_LIMITS or self.cant_deal_DRM:
-                        self.logger.warning(f"达到最大重试次数3，跳过下载: {vid}")
+                        self.logger.warning(f"达到最大重试次数3, 跳过下载: {vid}")
                         self.retry_reget_cookies_times = 0
                         self.cant_deal_DRM = False
                         break
                     self.reget_cookies_nums += 1
                     reget_cookies(self.config, self.logger)
-                    self.logger.warning(f"下载失败，（重新获取cookies重试）:{vid}， 重新获取cookies次数{self.reget_cookies_nums}")
+                    self.logger.warning(f"下载失败, （重新获取cookies重试）:{vid}, 重新获取cookies次数{self.reget_cookies_nums}")
                     res = self.download_video(vid, folder_name)
                     if not res:
                         self.retry_reget_cookies_times += 1
@@ -64,15 +67,29 @@ class Downloader:
             return []
         with open(path, encoding="utf-8") as f:
             return [line.strip() for line in f if line.strip()]
-
+        
+    @staticmethod
     def is_file_in_use(file_path):
-        """检查文件是否正在被使用"""
+        
         try:
-            with open(file_path, "rb") as f:
-                pass  # 能正常打开文件，说明没有被占用
-            return False
+            with open(file_path, 'r+b') as f:
+                # msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, os.path.getsize(file_path))
+                # OverflowError: Python int too large to convert to C long
+                # # 根本原因：msvcrt.locking() 的第 3 个参数 nbytes 是一个 C long 类型（在 32 位系统上最大为 2,147,483,647，即约 2GB），而你试图加锁的文件大小可能远超这个限制，比如超过了 2GB。
+                # msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, os.path.getsize(file_path))
+                
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)  # 只锁 1 个字节即可
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                return False  # 能加锁又解锁, 说明没被占用
         except IOError:
-            return True  # 文件正在被占用
+            return True  # 加锁失败, 说明文件被占用
+        # """检查文件是否正在被使用"""
+        # try:
+        #     with open(file_path, "rb") as f:
+        #         pass  # 能正常打开文件, 说明没有被占用
+        #     return False
+        # except IOError:
+        #     return True  # 文件正在被占用
     
     def get_video_ids(self, channel_url):
         cmd = ["yt-dlp", "--flat-playlist", "-J", channel_url]
@@ -106,24 +123,33 @@ class Downloader:
         if self.config.data.get("limit_rate") != "unlimited":
             cmd += ["--limit-rate", self.config.data["limit_rate"]]
 
-        # 获取文件名
-        cmd_check_filename = cmd + ["--print", "filename"]
-        result = subprocess.run(cmd_check_filename, capture_output=True, text=True)
-        filename = result.stdout.strip()
-
         cmd2 = cmd.copy()
         cmd += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
+        
+        # 获取文件名
+        cmd_check_filename = ["yt-dlp", url, "--output", final_path,] + ["--cookies", self.config.data["cookies_file"]] + ["--print", "filename"] + ["--merge-output-format", "mp4"]
+        result = subprocess.run(cmd_check_filename, capture_output=True, 
+                                # encoding='utf-8')
+                                text=True)
+        filename = os.path.basename(result.stdout.strip())
+        # filename = re.search(r'[^\\]+\.webm', stdout.strip()).group(0)
         try:
             subprocess.run(cmd, check=True, capture_output=True)
             self.logger.info(f"下载成功: {url}")
             self.stats.success += 1
 
             needBeMovedFilepath = os.path.join(target_dir, filename)
-            # 检查文件是否正在被使用
-            if is_file_in_use(needBeMovedFilepath):
-                self.logger.info(f"移动文件跳过（文件正在使用）{filename}")
 
-            # 获取视频分辨率，限制 5 秒超时
+            if not os.path.exists(needBeMovedFilepath):
+                self.logger.info(f"移动文件跳过（文件下载过了）")
+                return True  # 文件不存在, 视为文件下载过了
+            
+            # 检查文件是否正在被使用
+            if Downloader.is_file_in_use(needBeMovedFilepath):
+                self.logger.info(f"移动文件跳过（文件正在使用）{filename} \n {needBeMovedFilepath} \n {result}")
+                return True
+
+            # 获取视频分辨率, 限制 5 秒超时
             cmd_resolution = [
                 "ffprobe", "-v", "error", "-select_streams", "v:0",
                 "-show_entries", "stream=width,height", "-of", "csv=p=0", needBeMovedFilepath
@@ -142,6 +168,7 @@ class Downloader:
 
                 # 移动文件到目标文件夹
                 shutil.move(needBeMovedFilepath, os.path.join(resolution_folder, filename))
+                self.logger.info(f"移动文件成功{filename}")
                 # print(f"已移动: {filename} → {resolution_folder}/")
 
             except subprocess.TimeoutExpired:
@@ -154,12 +181,12 @@ class Downloader:
         except subprocess.CalledProcessError as e:
             stderr = e.stderr or b""
             if b"DRM" in e.stderr or b"Protected" in stderr:
-                self.logger.warning(f"检测到DRM保护，使用安全格式重试...: {url}")
+                self.logger.warning(f"检测到DRM保护, 使用安全格式重试...: {url}")
                 cmd2 += ["-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best", "--merge-output-format", "mp4"]
                 self.use_safty_cmd_DRM += 1
                 try:
                     subprocess.run(cmd2, check=True)
-                    self.logger.info(f"使用安全格式下载成功: {url}，遇到DRM保护，但是下载成功的次数：{self.use_safty_cmd_DRM}")
+                    self.logger.info(f"使用安全格式下载成功: {url}, 遇到DRM保护, 但是下载成功的次数：{self.use_safty_cmd_DRM}")
                     self.stats.success += 1
                     return True
                 except subprocess.CalledProcessError:
@@ -172,14 +199,14 @@ class Downloader:
             self.stats.fail += 1
         # wait_for_user_action():
             # while True:
-            #     choice = input("处理失败，请修复 cookies 后输入是否继续？(y/n): ").strip().lower()
+            #     choice = input("处理失败, 请修复 cookies 后输入是否继续？(y/n): ").strip().lower()
             #     if choice == 'y':
             #         print("继续执行程序...")
             #         break
             #     elif choice == 'n':
             #         print("你自己按ctrl+c退出程序。")
             #     else:
-            #         print("无效输入，请输入 y 或 n。")
+            #         print("无效输入, 请输入 y 或 n。")
             # # （继续循环或重试）
             # return False
         # get cookies from browser
