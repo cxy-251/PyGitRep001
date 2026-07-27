@@ -1,0 +1,58 @@
+:root {
+  color-scheme: light dark;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; padding: 14px; background: #0f172a; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; border: 0; border-radius: 8px; padding: 9px 12px; }
+button:disabled { cursor: not-allowed; opacity: 0.55; }
+input, textarea, select {
+  width: 100%;
+  margin-top: 6px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #111827;
+  color: #f8fafc;
+  padding: 9px 10px;
+}
+textarea { resize: vertical; }
+label { display: block; margin-top: 12px; font-size: 13px; color: #cbd5e1; }
+
+.app-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+h1 { font-size: 19px; margin: 0; }
+h2 { font-size: 15px; margin: 0 0 10px; }
+p { margin: 5px 0; line-height: 1.5; }
+.app-header p { font-size: 12px; color: #94a3b8; }
+
+.status-card, .workflow-card, .log-card {
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #1e293b;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.status-card > div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.label { color: #94a3b8; }
+.hint, .notice { color: #fbbf24; font-size: 12px; }
+.hidden { display: none; }
+.full { width: 100%; margin-top: 10px; }
+.primary { background: #2563eb; color: white; }
+.secondary { background: #334155; color: #e2e8f0; }
+.danger { background: #7f1d1d; color: white; }
+.button-row { display: flex; gap: 8px; margin-top: 10px; }
+.button-row button { flex: 1; }
+.check-row { display: flex; align-items: center; gap: 8px; }
+.check-row input { width: auto; margin: 0; }
+.summary { margin: 10px 0; color: #93c5fd; font-size: 12px; }
+.result-list { display: grid; gap: 8px; max-height: 360px; overflow: auto; }
+.result-item { border: 1px solid #475569; border-radius: 9px; padding: 9px; background: #111827; }
+.result-item.selected { border-color: #60a5fa; box-shadow: 0 0 0 1px #60a5fa inset; }
+.result-item strong { display: block; font-size: 13px; }
+.result-item small { color: #94a3b8; }
+.result-item p { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
+.result-item button { margin-top: 7px; padding: 6px 9px; }
+.log-card pre { margin: 0; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 11px; color: #cbd5e1; }
