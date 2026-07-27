@@ -4,58 +4,61 @@ html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) body {
   overscroll-behavior: none !important;
 }
 
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) ytd-app,
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #content,
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #page-manager,
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) ytd-watch-flexy,
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #columns,
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #primary,
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #primary-inner,
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) ytd-player,
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) ytd-reel-video-renderer {
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
+  [data-yt-webpage-fullscreen-ancestor="true"] {
   transform: none !important;
   filter: none !important;
   perspective: none !important;
   contain: none !important;
+  isolation: auto !important;
+  opacity: 1 !important;
   overflow: visible !important;
   clip: auto !important;
   clip-path: none !important;
+  mask: none !important;
+  will-change: auto !important;
 }
 
 html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
-  #movie_player[data-yt-webpage-fullscreen="true"] {
+  [data-yt-webpage-fullscreen-sibling="true"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
+  #movie_player[data-yt-webpage-fullscreen-player="true"] {
   position: fixed !important;
   inset: 0 !important;
   width: 100vw !important;
+  width: 100dvw !important;
   height: 100vh !important;
+  height: 100dvh !important;
   min-width: 0 !important;
   min-height: 0 !important;
   max-width: none !important;
   max-height: none !important;
   margin: 0 !important;
   padding: 0 !important;
-  z-index: 2147483647 !important;
+  border: 0 !important;
+  z-index: 2147483646 !important;
   background: #000 !important;
   overflow: hidden !important;
 }
 
 html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
-  #movie_player[data-yt-webpage-fullscreen="true"] .html5-video-container,
+  #movie_player[data-yt-webpage-fullscreen-player="true"] .html5-video-container,
 html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
-  #movie_player[data-yt-webpage-fullscreen="true"] .ytp-player-content,
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
-  #movie_player[data-yt-webpage-fullscreen="true"] .ytp-chrome-bottom {
-  max-width: none !important;
-}
-
-html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
-  #movie_player[data-yt-webpage-fullscreen="true"] .html5-video-container {
+  #movie_player[data-yt-webpage-fullscreen-player="true"] .ytp-player-content {
   width: 100% !important;
   height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
 }
 
 html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
-  #movie_player[data-yt-webpage-fullscreen="true"] video.html5-main-video {
+  #movie_player[data-yt-webpage-fullscreen-player="true"] video.html5-main-video {
   position: absolute !important;
   inset: 0 !important;
   width: 100% !important;
@@ -71,25 +74,12 @@ html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
 
 #yt-webpage-fullscreen-button {
   position: relative !important;
-  width: 48px !important;
 }
 
 #yt-webpage-fullscreen-button svg {
+  display: block;
   width: 100%;
   height: 100%;
-  padding: 11px;
-  box-sizing: border-box;
   fill: currentColor;
   pointer-events: none;
-}
-
-#yt-webpage-fullscreen-button[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 7px;
-  height: 2px;
-  border-radius: 2px;
-  background: currentColor;
 }
