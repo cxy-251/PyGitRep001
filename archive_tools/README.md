@@ -1,56 +1,39 @@
 # Extracted Archive Tools
 
-This directory contains the reusable parts extracted from large historical notebooks.
-The original projects are no longer maintained. Each script is intentionally standalone,
-uses command-line arguments instead of hard-coded local paths, and avoids destructive
-behavior unless an explicit flag such as `--apply`, `--move`, or `--replace-source` is used.
+这里保存从旧 Notebook、重复项目和一次性脚本中提取出的独立工具。
 
-## Categories
+## 目录
 
-- `media/`: FFmpeg and FFprobe utilities.
-- `files/`: file organization and inventory utilities.
-- `youtube/`: archived yt-dlp and browser-cookie helpers.
-- `tts/`: text-to-speech helpers.
-- `web/`: archived web-scraping prototypes.
+- `media/`：FFmpeg、FFprobe、视频清单、音频转换和拼接；
+- `files/`：重命名、分组、目录整理、文件树和残片清理；
+- `youtube/`：yt-dlp、YouTube Data API、Cookie 和下载 GUI；
+- `text/`：字符串格式化与校验；
+- `codegen/`：C++ 和 Python 代码生成；
+- `system/`：磁盘等系统检查；
+- `network/`：代理与网络检查；
+- `gui/`：从旧 GUI 实验中提取出的可运行示例；
+- `tts/`：文字转语音；
+- `web/`：网页抓取历史实现。
 
-## Main extraction map
+## 设计原则
 
-- `Tools/000DealMV/dealMV.ipynb`, `DealManyVideos.ipynb`, `DealLongVideo.ipynb`
-  → `media/` and `files/`.
-- `Tools/003DealMP3/covertToMp3.ipynb`
-  → `media/convert_audio_to_mp3.py`.
-- `Tools/005YTProjMerge/YTExtractor*.ipynb`
-  → `youtube/download_channel_media.py`.
-- `Tools/001AIGenReanVoice/GenRealVoice.ipynb`
-  → `tts/edge_tts_to_mp3.py`.
-- `Tools/004Kwai/KwaiExtractor.ipynb`
-  → `web/kuaishou_profile_urls.py`.
-- `Tools/genFileTreeJson.ipynb`
-  → `files/export_file_tree_json.py`.
-- `Tools/littleTrick.ipynb`
-  → `files/group_items.py` and `files/collect_apks.py`.
-- `Tools/002YTProj/LoginYT.py` and `sortChannels.py`
-  → the corresponding `youtube/` scripts.
+1. 不再写死本机盘符、Cookie 路径和输出目录；
+2. 一个文件只完成一个明确功能；
+3. 重命名、移动、删除和替换默认不执行；
+4. 外部程序失败时检查退出码；
+5. Cookie、OAuth token 和客户端密钥不进入 Git；
+6. 每个命令行工具提供 `--help`。
 
-The removed source files remain recoverable from Git history.
+## 依赖
 
-## Safety rules
+- 媒体：`ffmpeg`、`ffprobe`；
+- YouTube：`yt-dlp`；
+- 浏览器 Cookie：`browser-cookie3`；
+- Playwright 抓取：`playwright` 与 Chromium；
+- YouTube Data API：`google-api-python-client`、`google-auth-oauthlib`；
+- TTS：`edge-tts`；
+- GUI 示例：按脚本分别使用 Tkinter、PyQt5、Kivy、OpenCV 或 Matplotlib。
 
-1. Run scripts without `--apply` first when a dry-run mode is available.
-2. Use copied test data before moving, renaming, grouping, or replacing files.
-3. Treat exported cookie files as password-equivalent secrets.
-4. FFmpeg, yt-dlp, Playwright, website DOM selectors, and browser cookie formats may
-   have changed since these tools were originally written.
-5. These scripts are archived reference implementations, not actively supported products.
+完整索引见 [`../ARCHIVE_INDEX.md`](../ARCHIVE_INDEX.md)。
 
-## Dependencies
-
-Most file tools use only the Python standard library.
-
-- Media tools: `ffmpeg` and `ffprobe` in `PATH`.
-- YouTube download tools: `yt-dlp`.
-- Cookie export: `browser-cookie3`.
-- Edge TTS: `edge-tts`.
-- Kuaishou scraper: `playwright` plus an installed Chromium browser.
-
-Use `python <script> --help` for the exact arguments of each tool.
+被替代的旧文件仍可从 Git 历史恢复。

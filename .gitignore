@@ -3,6 +3,11 @@ repo-audit.txt
 rename-map-*.json
 file_tree.json
 kuaishou_videos.json
+video_catalog*.csv
+folder_item_counts*.csv
+folder_video_summary*.csv
+youtube_creators*.csv
+playlist_creators*.csv
 
 # Python
 __pycache__/
@@ -26,11 +31,16 @@ ConfigPrivate/
 **/cookies.txt
 **/cookies-*.txt
 **/cookies_*.txt
+youtube-token.json
+**/youtube-token*.json
+client_secret*.json
+client-secrets*.json
 
 # Logs, caches and partial downloads
 *.log
 *.part
 *.tmp
+*.ytdl
 **/cache/
 **/logs/
 
