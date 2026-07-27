@@ -9,7 +9,8 @@
 |---|---|
 | 归档成品 | 当时已完成并实际使用过，现不再主动开发 |
 | 一次性脚本 | 为某个具体任务编写，路径和参数通常写死 |
-| 实验 | 原型、失败尝试或未完成实现 |
+| 实验 | 原型或未完成实现 |
+| 失败实验 | 已确认方案不可行或代码无法完成原目标 |
 | 学习记录 | 算法、设计模式或工具学习笔记 |
 | 生成数据 | 程序输出、下载结果或保存的网页资源，不是源代码 |
 | 高风险 | 会覆盖、移动或删除真实文件，运行前必须备份 |
@@ -26,7 +27,7 @@
 
 | 功能 | 代码入口 | 状态 | 说明 |
 |---|---|---|---|
-| 单文件频道批量下载器 | [`youtube_batch_downloader_v2/youtube_batch_downloader.py`](Tools/002YTProj/youtube_batch_downloader_v2/youtube_batch_downloader.py) | 归档脚本 | v2 单文件版本，包含配置监听、磁盘检查和批量下载 |
+| 单文件频道批量下载器 | [`youtube_batch_downloader_v2/youtube_batch_downloader.py`](Tools/002YTProj/youtube_batch_downloader_v2/youtube_batch_downloader.py) | 一次性脚本 | v2 单文件版本，包含配置监听、磁盘检查和批量下载 |
 | 模块化频道批量下载器入口 | [`youtube_batch_downloader_v3/main.py`](Tools/002YTProj/youtube_batch_downloader_v3/main.py) | 实验 | v3 拆分后的入口 |
 | v3 下载核心 | [`core/downloader.py`](Tools/002YTProj/youtube_batch_downloader_v3/core/downloader.py) | 实验 | 下载、重试、Cookie 刷新、分辨率分类；存在重复逻辑和硬编码 |
 | v3 配置热更新 | [`utils/config_loader.py`](Tools/002YTProj/youtube_batch_downloader_v3/utils/config_loader.py) | 实验 | 使用 watchdog 监听配置文件 |
@@ -55,7 +56,7 @@
 | 批量视频处理 | [`DealManyVideos.ipynb`](Tools/000DealMV/DealManyVideos.ipynb) | 一次性脚本 | 批处理实验 |
 | 视频与音频杂项处理 | [`dealMV.ipynb`](Tools/000DealMV/dealMV.ipynb) | 高风险 | 包含随机重命名、旋转、合并、目录打散和移动文件等互不相关操作 |
 | 批量转换音频为 MP3 | [`covertToMp3.ipynb`](Tools/003DealMP3/covertToMp3.ipynb) | 高风险 | FFmpeg 失败时仍可能删除源文件；不要直接对唯一原件运行 |
-| FFmpeg 截取 MP4 命令备忘 | [`ffmpegCutMP4.txt`](Tools/ffmpegCutMP4.txt) | 归档脚本 | 命令片段 |
+| FFmpeg 截取 MP4 命令备忘 | [`ffmpegCutMP4.txt`](Tools/ffmpegCutMP4.txt) | 一次性脚本 | 命令片段 |
 | Edge TTS 与 ChatTTS 实验 | [`GenRealVoice.ipynb`](Tools/001AIGenReanVoice/GenRealVoice.ipynb) | 实验 | Edge TTS 示例可用；ChatTTS 部分保存了失败堆栈和本机模型路径 |
 
 ## 网页抓取
@@ -88,9 +89,9 @@
 
 | 内容 | 路径 | 状态 | 说明 |
 |---|---|---|---|
-| C++ 测试程序 | [`test.cpp`](test.cpp) | 临时实验 | 最小控制台测试 |
+| C++ 测试程序 | [`test.cpp`](test.cpp) | 实验 | 最小控制台测试 |
 | 编译产物 | [`test.exe`](test.exe) | 生成数据 | Windows 可执行文件，不是源代码 |
-| Notebook 测试 | [`test.ipynb`](test.ipynb) · [`test2.ipynb`](test2.ipynb) | 临时实验 | 根目录草稿 |
+| Notebook 测试 | [`test.ipynb`](test.ipynb) · [`test2.ipynb`](test2.ipynb) | 实验 | 根目录草稿 |
 | 下载目录 | [`downloads/`](downloads/) | 生成数据 | 运行脚本产生的本地文件 |
 
 ## 大型生成数据
