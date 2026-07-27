@@ -90,7 +90,12 @@ YouTube is a trademark of Google LLC. This extension is not affiliated with or e
 
 ## 图片准备
 
-必须人工截取真实运行画面。建议使用 `1280×800` PNG：
+打包脚本会生成：
+
+- `store-assets/store-icon-128.png`：商店图标；
+- `store-assets/small-promo-440x280.png`：小型宣传图。
+
+至少还需要人工截取一张真实运行截图。建议准备 3–5 张 `1280×800` PNG：
 
 1. 普通视频页面，标出控制栏中的网页全屏按钮；
 2. 网页全屏状态，清楚显示 Chrome 标签栏和地址栏仍然存在；
@@ -111,19 +116,23 @@ pwsh -File .\scripts\build-store-package.ps1
 脚本会：
 
 1. 生成 16、32、48、128 像素 PNG 图标；
-2. 创建仅包含发布文件的临时目录；
-3. 在发布包的 `manifest.json` 中加入图标配置；
-4. 输出可上传的 ZIP 文件。
+2. 生成 128×128 商店图标和 440×280 小型宣传图；
+3. 创建仅包含发布文件的临时目录；
+4. 在发布包的 `manifest.json` 中加入图标配置；
+5. 输出可上传的 ZIP 文件。
 
 生成位置：
 
-`.store-build/viewport-fullscreen-for-youtube-v<版本号>.zip`
+- 发布 ZIP：`.store-build/viewport-fullscreen-for-youtube-v<版本号>.zip`
+- 解压测试目录：`.store-build/package/`
+- 商店图片：`.store-build/store-assets/`
 
 提交前检查：
 
 - 扩展版本号已递增；
 - ZIP 在 `chrome://extensions` 中可正常加载；
 - 至少完成普通视频、Shorts、窗口缩放、`Esc` 和原生全屏往返测试；
+- 已准备至少一张真实运行截图；
 - 商店标题、说明、截图和隐私字段与当前版本行为一致；
 - 隐私政策 URL 使用公开可访问地址：
   `https://github.com/cxy-251/PyGitRep001/blob/main/Tools/003YouTubeViewportFullscreen/PRIVACY.md`；
