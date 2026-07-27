@@ -1,0 +1,85 @@
+html.yt-vfs-active:not(.yt-vfs-native-fullscreen),
+html.yt-vfs-active:not(.yt-vfs-native-fullscreen) body {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-ancestor="true"] {
+  transform: none !important;
+  filter: none !important;
+  perspective: none !important;
+  contain: none !important;
+  overflow: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+  mask: none !important;
+}
+
+html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] {
+  position: fixed !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  z-index: 2147483646 !important;
+  background: #000 !important;
+  isolation: isolate !important;
+  transform: none !important;
+  overflow: hidden !important;
+}
+
+html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] > #container,
+html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] #movie_player,
+html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] .html5-video-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] video.html5-main-video {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+}
+
+.yt-vfs-player-button {
+  position: relative !important;
+}
+
+.yt-vfs-player-button svg {
+  width: 100%;
+  height: 100%;
+  padding: 11px;
+  box-sizing: border-box;
+  fill: currentColor;
+  pointer-events: none;
+}
+
+.yt-vfs-player-button[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 7px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
