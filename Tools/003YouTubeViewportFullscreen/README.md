@@ -20,7 +20,7 @@
 - `PRIVACY.md`：公开隐私政策。
 - `STORE.md`：Chrome Web Store 文案、审核字段和发布清单。
 - `assets/icon-source.svg`：原创图标源稿，不直接用于 manifest。
-- `scripts/build-store-package.ps1`：生成 PNG 图标并创建商店 ZIP。
+- `scripts/build-store-package.ps1`：生成 PNG 图标、宣传图和商店 ZIP。
 
 `content.js` 保持单文件和零依赖，按“常量、运行状态、播放器识别、网页全屏布局、按钮、观察器、状态同步、生命周期、启动入口”分区。所有可变运行状态集中在 `state` 对象中，便于统一清理和后续维护。
 
@@ -40,13 +40,15 @@
 pwsh -File .\scripts\build-store-package.ps1
 ```
 
-脚本会生成商店要求使用的 PNG 图标，把图标配置写入临时发布 manifest，并输出：
+脚本会生成 PNG 扩展图标、128×128 商店图标、440×280 小型宣传图，并把图标配置写入临时发布 manifest。输出位置：
 
 ```text
 .store-build/viewport-fullscreen-for-youtube-v<版本号>.zip
+.store-build/package/
+.store-build/store-assets/
 ```
 
-源目录不会写入二进制图标或构建产物。商店说明、截图要求、隐私字段和提交检查见 [STORE.md](./STORE.md)。
+源目录不会写入二进制图标或构建产物。真实运行截图仍需人工截取；商店说明、截图要求、隐私字段和提交检查见 [STORE.md](./STORE.md)。
 
 ## 回归检查
 
