@@ -16,6 +16,7 @@ $extensionRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
 $stageRoot = Join-Path $outputRoot "package"
 $iconsRoot = Join-Path $stageRoot "icons"
+$storeAssetsRoot = Join-Path $outputRoot "store-assets"
 $manifestSource = Join-Path $extensionRoot "manifest.json"
 
 function New-RoundedRectanglePath {
@@ -144,6 +145,75 @@ function Write-ViewportIcon {
     }
 }
 
+function Write-SmallPromoTile {
+    param(
+        [string]$IconPath,
+        [string]$Destination
+    )
+
+    $bitmap = $null
+    $graphics = $null
+    $icon = $null
+    $backgroundBrush = $null
+    $titleBrush = $null
+    $subtitleBrush = $null
+    $titleFont = $null
+    $subtitleFont = $null
+
+    try {
+        $bitmap = [System.Drawing.Bitmap]::new(
+            440,
+            280,
+            [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
+        )
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
+
+        $backgroundBrush = [System.Drawing.SolidBrush]::new(
+            [System.Drawing.ColorTranslator]::FromHtml("#202124")
+        )
+        $graphics.FillRectangle($backgroundBrush, 0, 0, 440, 280)
+
+        $icon = [System.Drawing.Image]::FromFile($IconPath)
+        $graphics.DrawImage($icon, 28, 60, 160, 160)
+
+        $titleBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::White)
+        $subtitleBrush = [System.Drawing.SolidBrush]::new(
+            [System.Drawing.ColorTranslator]::FromHtml("#BDC1C6")
+        )
+        $titleFont = [System.Drawing.Font]::new(
+            "Segoe UI Semibold",
+            30,
+            [System.Drawing.FontStyle]::Regular,
+            [System.Drawing.GraphicsUnit]::Pixel
+        )
+        $subtitleFont = [System.Drawing.Font]::new(
+            "Segoe UI",
+            16,
+            [System.Drawing.FontStyle]::Regular,
+            [System.Drawing.GraphicsUnit]::Pixel
+        )
+
+        $graphics.DrawString("VIEWPORT", $titleFont, $titleBrush, 210, 76)
+        $graphics.DrawString("FULLSCREEN", $titleFont, $titleBrush, 210, 116)
+        $graphics.DrawString("KEEP TABS VISIBLE", $subtitleFont, $subtitleBrush, 212, 172)
+
+        $bitmap.Save($Destination, [System.Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally {
+        if ($subtitleFont) { $subtitleFont.Dispose() }
+        if ($titleFont) { $titleFont.Dispose() }
+        if ($subtitleBrush) { $subtitleBrush.Dispose() }
+        if ($titleBrush) { $titleBrush.Dispose() }
+        if ($backgroundBrush) { $backgroundBrush.Dispose() }
+        if ($icon) { $icon.Dispose() }
+        if ($graphics) { $graphics.Dispose() }
+        if ($bitmap) { $bitmap.Dispose() }
+    }
+}
+
 if (-not (Test-Path $manifestSource)) {
     throw "未找到 manifest.json：$manifestSource"
 }
@@ -151,7 +221,11 @@ if (-not (Test-Path $manifestSource)) {
 if (Test-Path $stageRoot) {
     Remove-Item $stageRoot -Recurse -Force
 }
+if (Test-Path $storeAssetsRoot) {
+    Remove-Item $storeAssetsRoot -Recurse -Force
+}
 New-Item $iconsRoot -ItemType Directory -Force | Out-Null
+New-Item $storeAssetsRoot -ItemType Directory -Force | Out-Null
 
 foreach ($fileName in @("content.js", "content.css")) {
     $source = Join-Path $extensionRoot $fileName
@@ -164,6 +238,10 @@ foreach ($fileName in @("content.js", "content.css")) {
 foreach ($size in @(16, 32, 48, 128)) {
     Write-ViewportIcon -Size $size -Destination (Join-Path $iconsRoot "icon$size.png")
 }
+
+$storeIconPath = Join-Path $storeAssetsRoot "store-icon-128.png"
+Copy-Item (Join-Path $iconsRoot "icon128.png") $storeIconPath
+Write-SmallPromoTile -IconPath $storeIconPath -Destination (Join-Path $storeAssetsRoot "small-promo-440x280.png")
 
 $manifest = Get-Content $manifestSource -Raw | ConvertFrom-Json
 $manifest | Add-Member -NotePropertyName "icons" -NotePropertyValue ([ordered]@{
@@ -191,5 +269,7 @@ Compress-Archive -Path (Join-Path $stageRoot "*") -DestinationPath $zipPath -For
 
 Write-Host "Chrome Web Store 发布包已生成："
 Write-Host $zipPath
+Write-Host "商店图标和小型宣传图："
+Write-Host $storeAssetsRoot
 Write-Host "提交前请先在 chrome://extensions 中加载以下目录测试："
 Write-Host $stageRoot
