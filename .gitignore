@@ -1,1 +1,44 @@
-.git/
+# Local audit and temporary notes
+repo-audit.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE and OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Secrets and private configuration
+.env
+.env.*
+ConfigPrivate/
+**/cookies.txt
+**/cookies-*.txt
+**/cookies_*.txt
+
+# Logs, caches and partial downloads
+*.log
+*.part
+*.tmp
+**/cache/
+**/logs/
+
+# Local build output
+*.exe
+.store-build/
+
+# Generated/downloaded archive data: existing tracked files remain in history,
+# while new local output under these paths is not added accidentally.
+downloads/
+Tools/005YTProjMerge/music2/
+Tools/004Kwai/快手_files/
+Tools/004Kwai/*.html
+Tools/001AIGenReanVoice/*.mp3
