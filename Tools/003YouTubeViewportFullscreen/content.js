@@ -2,11 +2,12 @@
   "use strict";
 
   const BUTTON_ID = "yt-webpage-fullscreen-button";
+  const BACKDROP_ID = "yt-webpage-fullscreen-backdrop";
   const ACTIVE_CLASS = "yt-webpage-fullscreen-active";
   const NATIVE_CLASS = "yt-webpage-native-fullscreen";
   const PLAYER_ATTRIBUTE = "data-yt-webpage-fullscreen-player";
   const ANCESTOR_ATTRIBUTE = "data-yt-webpage-fullscreen-ancestor";
-  const SIBLING_ATTRIBUTE = "data-yt-webpage-fullscreen-sibling";
+  const LEGACY_SIBLING_ATTRIBUTE = "data-yt-webpage-fullscreen-sibling";
 
   const ENTER_ICON = `
     <svg viewBox="0 0 36 36" aria-hidden="true" focusable="false">
@@ -21,15 +22,17 @@
   let active = false;
   let currentPlayer = null;
   let boundPlayer = null;
+  let boundControlsRoot = null;
   let savedScrollX = 0;
   let savedScrollY = 0;
   let savedFocus = null;
   let reconcileTimer = 0;
-  let discoveryObserver = null;
-  let playerObserver = null;
+  let resizeTimer = 0;
   let healthTimer = 0;
+  let missingPlayerSince = 0;
+  let discoveryObserver = null;
+  let controlsObserver = null;
   let markedAncestors = [];
-  let hiddenSiblings = [];
 
   function getPageKind() {
     if (location.pathname === "/watch") return "watch";
@@ -44,12 +47,23 @@
     return width * height;
   }
 
-  function scorePlayer(player, pageKind) {
-    if (!(player instanceof HTMLElement) || !player.isConnected) return -Infinity;
+  function isRenderedPlayer(player) {
+    if (!(player instanceof HTMLElement) || !player.isConnected) return false;
 
     const rect = player.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return -Infinity;
+    if (rect.width <= 1 || rect.height <= 1) return false;
 
+    const style = getComputedStyle(player);
+    return style.display !== "none"
+      && style.visibility !== "hidden"
+      && Number(style.opacity || 1) > 0
+      && Boolean(player.querySelector("video.html5-main-video, video"));
+  }
+
+  function scorePlayer(player, pageKind) {
+    if (!isRenderedPlayer(player)) return -Infinity;
+
+    const rect = player.getBoundingClientRect();
     const video = player.querySelector("video.html5-main-video, video");
     let score = visibleArea(player);
 
@@ -59,7 +73,16 @@
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) score += 1_000_000;
     }
 
+    if (pageKind === "watch") {
+      const watchPage = player.closest("ytd-watch-flexy");
+      if (watchPage && !watchPage.hasAttribute("hidden")) score += 100_000_000;
+    }
+
     if (pageKind === "shorts") {
+      const renderer = player.closest("ytd-reel-video-renderer");
+      if (renderer?.matches("[is-active], [active]")) score += 500_000_000;
+      if (renderer?.getAttribute("aria-hidden") === "false") score += 100_000_000;
+
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
       const distance = Math.hypot(
@@ -76,12 +99,17 @@
     const pageKind = getPageKind();
     if (pageKind === "unsupported") return null;
 
+    if (active && isRenderedPlayer(currentPlayer)) {
+      return currentPlayer;
+    }
+
     const selector = pageKind === "watch"
-      ? "ytd-watch-flexy #movie_player, ytd-player #movie_player, #movie_player"
+      ? "ytd-watch-flexy:not([hidden]) #movie_player, ytd-player #movie_player, #movie_player"
       : "ytd-reel-video-renderer #movie_player, #shorts-container #movie_player, #movie_player";
 
     return Array.from(document.querySelectorAll(selector))
       .map((player) => ({ player, score: scorePlayer(player, pageKind) }))
+      .filter(({ score }) => Number.isFinite(score))
       .sort((left, right) => right.score - left.score)[0]?.player ?? null;
   }
 
@@ -89,57 +117,70 @@
     return player?.querySelector(".ytp-right-controls") ?? null;
   }
 
-  function findDirectChildAnchor(parent, descendant) {
-    if (!descendant || !parent.contains(descendant)) return null;
+  function clearLegacyMarkers() {
+    document.querySelectorAll(`[${LEGACY_SIBLING_ATTRIBUTE}]`).forEach((element) => {
+      element.removeAttribute(LEGACY_SIBLING_ATTRIBUTE);
+    });
+  }
 
-    let anchor = descendant;
-    while (anchor.parentElement && anchor.parentElement !== parent) {
-      anchor = anchor.parentElement;
+  function ensureBackdrop() {
+    let backdrop = document.getElementById(BACKDROP_ID);
+    if (!backdrop) {
+      backdrop = document.createElement("div");
+      backdrop.id = BACKDROP_ID;
+      backdrop.setAttribute("aria-hidden", "true");
     }
 
-    return anchor.parentElement === parent ? anchor : null;
+    const host = document.body ?? document.documentElement;
+    if (backdrop.parentElement !== host) host.appendChild(backdrop);
+    return backdrop;
   }
 
-  function isHideableSibling(element) {
-    return !["SCRIPT", "STYLE", "LINK", "META"].includes(element.tagName);
-  }
-
-  function clearLayoutMarkers() {
+  function clearLayoutMarkers({ removeBackdrop = true } = {}) {
     currentPlayer?.removeAttribute(PLAYER_ATTRIBUTE);
 
     for (const element of markedAncestors) {
       element.removeAttribute(ANCESTOR_ATTRIBUTE);
     }
+    markedAncestors = [];
 
-    for (const element of hiddenSiblings) {
-      element.removeAttribute(SIBLING_ATTRIBUTE);
+    if (removeBackdrop) document.getElementById(BACKDROP_ID)?.remove();
+  }
+
+  function getAncestorPath(player) {
+    const path = [];
+    let parent = player?.parentElement ?? null;
+
+    while (parent && parent !== document.documentElement) {
+      path.push(parent);
+      parent = parent.parentElement;
     }
 
-    markedAncestors = [];
-    hiddenSiblings = [];
+    return path;
+  }
+
+  function layoutPathIsCurrent(player) {
+    const path = getAncestorPath(player);
+    return currentPlayer === player
+      && player?.getAttribute(PLAYER_ATTRIBUTE) === "true"
+      && path.length === markedAncestors.length
+      && path.every((element, index) => (
+        element === markedAncestors[index]
+        && element.getAttribute(ANCESTOR_ATTRIBUTE) === "true"
+      ));
   }
 
   function applyLayoutMarkers(player) {
-    clearLayoutMarkers();
+    clearLayoutMarkers({ removeBackdrop: false });
     currentPlayer = player;
     currentPlayer.setAttribute(PLAYER_ATTRIBUTE, "true");
 
-    let branch = player;
-    let parent = player.parentElement;
-
-    while (parent && parent !== document.documentElement) {
-      parent.setAttribute(ANCESTOR_ATTRIBUTE, "true");
-      markedAncestors.push(parent);
-
-      for (const child of parent.children) {
-        if (child === branch || !isHideableSibling(child)) continue;
-        child.setAttribute(SIBLING_ATTRIBUTE, "true");
-        hiddenSiblings.push(child);
-      }
-
-      branch = parent;
-      parent = parent.parentElement;
+    markedAncestors = getAncestorPath(player);
+    for (const element of markedAncestors) {
+      element.setAttribute(ANCESTOR_ATTRIBUTE, "true");
     }
+
+    ensureBackdrop();
   }
 
   function notifyPlayerResize() {
@@ -159,49 +200,62 @@
     button.setAttribute("aria-pressed", String(active));
   }
 
+  function syncButtonMetrics(button, nativeButton) {
+    const rect = nativeButton.getBoundingClientRect();
+    if (rect.width > 0) {
+      button.style.setProperty("--yt-vfs-button-width", `${rect.width}px`);
+    }
+    if (rect.height > 0) {
+      button.style.setProperty("--yt-vfs-button-height", `${rect.height}px`);
+    }
+  }
+
   function removeButton() {
     document.getElementById(BUTTON_ID)?.remove();
   }
 
-  function insertButton(controls, button) {
-    const nativeFullscreenButton = controls.querySelector(".ytp-fullscreen-button");
-    const anchor = findDirectChildAnchor(controls, nativeFullscreenButton);
+  function createButton(nativeButton) {
+    const button = document.createElement("button");
+    const nativeClasses = Array.from(nativeButton.classList)
+      .filter((className) => className !== "ytp-fullscreen-button");
 
-    if (anchor?.parentNode === controls) {
-      controls.insertBefore(button, anchor);
-      return;
-    }
+    button.id = BUTTON_ID;
+    button.type = "button";
+    button.className = nativeClasses.join(" ");
+    button.classList.add("ytp-button");
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleViewportFullscreen();
+    });
 
-    controls.appendChild(button);
+    return button;
   }
 
   function ensureButtonForPlayer(player) {
     const controls = findControls(player);
-    if (!controls || !controls.isConnected) return false;
+    const nativeButton = controls?.querySelector(".ytp-fullscreen-button") ?? null;
+    const parent = nativeButton?.parentElement ?? null;
+    if (!controls || !nativeButton || !parent || !parent.isConnected) return false;
 
     let button = document.getElementById(BUTTON_ID);
-    if (!button || !controls.contains(button)) {
+    if (!button || button.parentElement !== parent) {
       button?.remove();
-      button = document.createElement("button");
-      button.id = BUTTON_ID;
-      button.type = "button";
-      button.className = "ytp-button";
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        toggleViewportFullscreen();
-      });
-
-      try {
-        insertButton(controls, button);
-      } catch (error) {
-        console.warn("[YouTube 网页全屏] 播放器控件正在重建，稍后重试。", error);
-        button.remove();
-        scheduleReconcile(120);
-        return false;
-      }
+      button = createButton(nativeButton);
     }
 
+    try {
+      if (button.nextElementSibling !== nativeButton) {
+        parent.insertBefore(button, nativeButton);
+      }
+    } catch (error) {
+      console.warn("[YouTube 网页全屏] 播放器控件正在重建，稍后重试。", error);
+      button.remove();
+      scheduleReconcile(120);
+      return false;
+    }
+
+    syncButtonMetrics(button, nativeButton);
     updateButtonState();
     return true;
   }
@@ -220,33 +274,41 @@
   }
 
   function bindPlayer(player) {
-    if (boundPlayer === player && player.isConnected) {
+    const controls = findControls(player);
+    const controlsRoot = player.querySelector(".ytp-chrome-bottom") ?? controls;
+
+    if (
+      boundPlayer === player
+      && boundControlsRoot === controlsRoot
+      && controlsRoot?.isConnected
+    ) {
       ensureButtonForPlayer(player);
       return;
     }
 
-    playerObserver?.disconnect();
+    controlsObserver?.disconnect();
+    controlsObserver = null;
     boundPlayer = player;
+    boundControlsRoot = controlsRoot;
 
-    playerObserver = new MutationObserver(() => scheduleReconcile(80));
-    playerObserver.observe(player, { childList: true, subtree: true });
-
-    if (active && currentPlayer !== player) {
-      applyLayoutMarkers(player);
-      notifyPlayerResize();
+    if (controlsRoot) {
+      controlsObserver = new MutationObserver(() => scheduleReconcile(80));
+      controlsObserver.observe(controlsRoot, { childList: true, subtree: true });
     }
 
     ensureButtonForPlayer(player);
   }
 
   function clearPlayerBinding() {
-    playerObserver?.disconnect();
-    playerObserver = null;
+    controlsObserver?.disconnect();
+    controlsObserver = null;
     boundPlayer = null;
+    boundControlsRoot = null;
   }
 
   function reconcile() {
     if (getPageKind() === "unsupported") {
+      missingPlayerSince = 0;
       stopDiscoveryObserver();
       clearPlayerBinding();
       removeButton();
@@ -256,13 +318,25 @@
 
     const player = findPlayer();
     if (!player) {
+      if (!missingPlayerSince) missingPlayerSince = Date.now();
       clearPlayerBinding();
       removeButton();
       startDiscoveryObserver();
+
+      if (active && Date.now() - missingPlayerSince > 1_500) {
+        exitViewportFullscreen();
+      }
       return;
     }
 
+    missingPlayerSince = 0;
     stopDiscoveryObserver();
+
+    if (active && !layoutPathIsCurrent(player)) {
+      applyLayoutMarkers(player);
+      notifyPlayerResize();
+    }
+
     bindPlayer(player);
   }
 
@@ -278,6 +352,7 @@
     applyLayoutMarkers(player);
     document.documentElement.classList.add(ACTIVE_CLASS);
     document.documentElement.classList.toggle(NATIVE_CLASS, Boolean(document.fullscreenElement));
+    bindPlayer(player);
     updateButtonState();
     notifyPlayerResize();
   }
@@ -329,7 +404,13 @@
 
   function syncNativeFullscreenState() {
     document.documentElement.classList.toggle(NATIVE_CLASS, Boolean(document.fullscreenElement));
-    if (active && !document.fullscreenElement) notifyPlayerResize();
+
+    if (active && !document.fullscreenElement) {
+      const player = findPlayer();
+      if (player && !layoutPathIsCurrent(player)) applyLayoutMarkers(player);
+      notifyPlayerResize();
+    }
+
     updateButtonState();
   }
 
@@ -338,21 +419,33 @@
     reconcileTimer = window.setTimeout(reconcile, delay);
   }
 
+  function scheduleViewportRefresh() {
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(() => {
+      const player = findPlayer();
+      if (active && player) {
+        applyLayoutMarkers(player);
+        notifyPlayerResize();
+      }
+      reconcile();
+    }, 100);
+  }
+
   function startHealthCheck() {
     window.clearInterval(healthTimer);
     healthTimer = window.setInterval(() => {
       if (document.visibilityState === "visible") reconcile();
-    }, 3_000);
+    }, 5_000);
   }
 
   document.addEventListener(
     "keydown",
     (event) => {
       if (
-        event.key !== "Escape" ||
-        !active ||
-        document.fullscreenElement ||
-        hasOpenPlayerPopup()
+        event.key !== "Escape"
+        || !active
+        || document.fullscreenElement
+        || hasOpenPlayerPopup()
       ) {
         return;
       }
@@ -374,21 +467,27 @@
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") scheduleReconcile(0);
   });
-  window.addEventListener("popstate", () => scheduleReconcile(100));
 
+  window.addEventListener("resize", (event) => {
+    if (event.isTrusted) scheduleViewportRefresh();
+  });
+  window.addEventListener("popstate", () => scheduleReconcile(100));
   window.addEventListener(
     "pagehide",
     () => {
       window.clearTimeout(reconcileTimer);
+      window.clearTimeout(resizeTimer);
       window.clearInterval(healthTimer);
       stopDiscoveryObserver();
       clearPlayerBinding();
       if (active) exitViewportFullscreen();
       removeButton();
+      clearLegacyMarkers();
     },
     { once: true }
   );
 
+  clearLegacyMarkers();
   startHealthCheck();
   reconcile();
 })();
