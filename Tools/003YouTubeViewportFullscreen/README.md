@@ -34,13 +34,13 @@
 
 ## Chrome Web Store 发布包
 
-在当前目录执行：
+仅在需要制作商店发布包时，在当前目录执行：
 
 ```powershell
-pwsh -File .\scripts\build-store-package.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-store-package.ps1
 ```
 
-脚本会生成 PNG 扩展图标、128×128 商店图标、440×280 小型宣传图，并把图标配置写入临时发布 manifest。输出位置：
+脚本使用 Windows 自带的 Windows PowerShell，不要求安装 PowerShell 7。它会生成 PNG 扩展图标、128×128 商店图标、440×280 小型宣传图，并把图标配置写入临时发布 manifest。输出位置：
 
 ```text
 .store-build/viewport-fullscreen-for-youtube-v<版本号>.zip
