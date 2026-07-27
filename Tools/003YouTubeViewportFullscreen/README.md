@@ -4,14 +4,16 @@
 
 ## 安装
 
-打开 `chrome://extensions`，开启“开发者模式”，点击“加载已解压的扩展程序”，选择当前目录。打开 YouTube 视频后，播放器右下角会出现网页全屏按钮。
+打开 `chrome://extensions`，开启“开发者模式”，点击“加载已解压的扩展程序”，选择当前目录。更新文件后，需要在扩展页面点击“重新加载”，并刷新已经打开的 YouTube 标签页。
 
 ## 支持范围
 
-支持普通视频、播放列表、直播、广告阶段、YouTube 站内换片和 Shorts；保持 YouTube 原播放器、字幕、控制栏、清晰度菜单和系统全屏功能。网页全屏期间仍可点击 YouTube 原生全屏按钮进入系统全屏，退出系统全屏后会恢复网页全屏状态。
+支持普通视频、播放列表、直播、广告阶段、YouTube 站内换片和 Shorts。网页全屏期间会隔离当前播放器的真实祖先路径，隐藏推荐流、评论区和页面其他兄弟区域，保留播放器字幕、控制栏、设置菜单和原生全屏功能。退出原生全屏后会恢复网页全屏状态。
 
-扩展不解析视频地址、不读取网络请求、不访问第三方服务，不申请额外权限，只在 `https://www.youtube.com/*` 注入 `content.js` 和 `content.css`。
+## 安全与性能
+
+扩展不解析视频地址、不读取网络请求、不访问第三方服务，不申请额外权限，只在 `https://www.youtube.com/*` 注入本地 `content.js` 和 `content.css`。播放器发现完成后，仅观察当前播放器 DOM，并使用低频健康检查处理 YouTube 控件重建。
 
 ## 维护说明
 
-YouTube DOM 不是公开稳定接口。当前实现以 `ytd-player`、`#movie_player`、`.ytp-right-controls` 和 `.ytp-fullscreen-button` 为主要定位点，并通过活动视频评分、YouTube 站内导航事件和 `MutationObserver` 处理播放器重建；YouTube 大规模调整播放器结构时需要更新选择器。
+YouTube DOM 不是公开稳定接口。当前实现以 `/watch`、`/shorts/`、`#movie_player`、`.ytp-right-controls` 和 `.ytp-fullscreen-button` 为主要定位点。普通视频优先选择 `ytd-watch-flexy` 中的播放器；Shorts 结合播放状态、可见面积和视口中心距离选择当前播放器。YouTube 大规模调整播放器结构时仍可能需要更新选择器。
