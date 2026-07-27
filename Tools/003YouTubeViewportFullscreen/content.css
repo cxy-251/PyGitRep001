@@ -11,7 +11,7 @@ html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
   perspective: none !important;
   contain: none !important;
   isolation: auto !important;
-  opacity: 1 !important;
+  z-index: auto !important;
   overflow: visible !important;
   clip: auto !important;
   clip-path: none !important;
@@ -20,9 +20,24 @@ html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
 }
 
 html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
-  [data-yt-webpage-fullscreen-sibling="true"] {
-  visibility: hidden !important;
-  pointer-events: none !important;
+  #yt-webpage-fullscreen-backdrop {
+  display: block !important;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  width: 100dvw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: #000 !important;
+  z-index: 2147483000 !important;
+  pointer-events: auto !important;
+}
+
+#yt-webpage-fullscreen-backdrop {
+  display: none;
 }
 
 html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
@@ -40,7 +55,7 @@ html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
   margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
-  z-index: 2147483646 !important;
+  z-index: 2147483001 !important;
   background: #000 !important;
   overflow: hidden !important;
 }
@@ -61,6 +76,7 @@ html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
   #movie_player[data-yt-webpage-fullscreen-player="true"] video.html5-main-video {
   position: absolute !important;
   inset: 0 !important;
+  display: block !important;
   width: 100% !important;
   height: 100% !important;
   min-width: 0 !important;
@@ -74,12 +90,24 @@ html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
 
 #yt-webpage-fullscreen-button {
   position: relative !important;
+  display: inline-block !important;
+  box-sizing: border-box !important;
+  width: var(--yt-vfs-button-width, 48px) !important;
+  min-width: var(--yt-vfs-button-width, 48px) !important;
+  height: var(--yt-vfs-button-height, 100%) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  flex: 0 0 var(--yt-vfs-button-width, 48px) !important;
+  vertical-align: top !important;
 }
 
 #yt-webpage-fullscreen-button svg {
   display: block;
   width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 0;
   fill: currentColor;
   pointer-events: none;
 }
