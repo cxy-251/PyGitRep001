@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  // ---------- 常量 ----------
+
   const BUTTON_ID = "yt-webpage-fullscreen-button";
   const BACKDROP_ID = "yt-webpage-fullscreen-backdrop";
   const ACTIVE_CLASS = "yt-webpage-fullscreen-active";
@@ -8,6 +10,16 @@
   const PLAYER_ATTRIBUTE = "data-yt-webpage-fullscreen-player";
   const ANCESTOR_ATTRIBUTE = "data-yt-webpage-fullscreen-ancestor";
   const LEGACY_SIBLING_ATTRIBUTE = "data-yt-webpage-fullscreen-sibling";
+
+  const TIMING = Object.freeze({
+    discoveryDelay: 120,
+    controlsDelay: 80,
+    navigationDelay: 150,
+    popstateDelay: 100,
+    viewportDelay: 100,
+    missingPlayerGrace: 1_500,
+    healthInterval: 5_000
+  });
 
   const ENTER_ICON = `
     <svg viewBox="0 0 36 36" aria-hidden="true" focusable="false">
@@ -19,20 +31,34 @@
       <path d="M7 15v-3h5V7h3v8H7Zm14 0V7h3v5h5v3h-8ZM7 21h8v8h-3v-5H7v-3Zm14 0h8v3h-5v5h-3v-8Z"/>
     </svg>`;
 
-  let active = false;
-  let currentPlayer = null;
-  let boundPlayer = null;
-  let boundControlsRoot = null;
-  let savedScrollX = 0;
-  let savedScrollY = 0;
-  let savedFocus = null;
-  let reconcileTimer = 0;
-  let resizeTimer = 0;
-  let healthTimer = 0;
-  let missingPlayerSince = 0;
-  let discoveryObserver = null;
-  let controlsObserver = null;
-  let markedAncestors = [];
+  // ---------- 运行状态 ----------
+
+  const state = {
+    viewport: {
+      active: false,
+      player: null,
+      ancestors: [],
+      savedScrollX: 0,
+      savedScrollY: 0,
+      savedFocus: null
+    },
+    binding: {
+      player: null,
+      controlsRoot: null
+    },
+    observers: {
+      discovery: null,
+      controls: null
+    },
+    timers: {
+      runtimeSync: 0,
+      viewportRefresh: 0,
+      healthCheck: 0
+    },
+    missingPlayerSince: 0
+  };
+
+  // ---------- 页面与播放器识别 ----------
 
   function getPageKind() {
     if (location.pathname === "/watch") return "watch";
@@ -40,10 +66,16 @@
     return "unsupported";
   }
 
-  function visibleArea(element) {
+  function getVisibleArea(element) {
     const rect = element.getBoundingClientRect();
-    const width = Math.max(0, Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0));
-    const height = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
+    const width = Math.max(
+      0,
+      Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0)
+    );
+    const height = Math.max(
+      0,
+      Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0)
+    );
     return width * height;
   }
 
@@ -65,7 +97,7 @@
 
     const rect = player.getBoundingClientRect();
     const video = player.querySelector("video.html5-main-video, video");
-    let score = visibleArea(player);
+    let score = getVisibleArea(player);
 
     if (video) {
       if (!video.paused && !video.ended) score += 1_000_000_000;
@@ -85,22 +117,23 @@
 
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      const distance = Math.hypot(
+      const distanceFromViewportCenter = Math.hypot(
         centerX - window.innerWidth / 2,
         centerY - window.innerHeight / 2
       );
-      score -= distance * 1_000;
+      score -= distanceFromViewportCenter * 1_000;
     }
 
     return score;
   }
 
-  function findPlayer() {
+  function findBestPlayer() {
     const pageKind = getPageKind();
     if (pageKind === "unsupported") return null;
 
-    if (active && isRenderedPlayer(currentPlayer)) {
-      return currentPlayer;
+    // 网页全屏期间优先保留当前播放器，避免响应式重排时切换到备用播放器。
+    if (state.viewport.active && isRenderedPlayer(state.viewport.player)) {
+      return state.viewport.player;
     }
 
     const selector = pageKind === "watch"
@@ -113,9 +146,11 @@
       .sort((left, right) => right.score - left.score)[0]?.player ?? null;
   }
 
-  function findControls(player) {
+  function findRightControls(player) {
     return player?.querySelector(".ytp-right-controls") ?? null;
   }
+
+  // ---------- 网页全屏布局 ----------
 
   function clearLegacyMarkers() {
     document.querySelectorAll(`[${LEGACY_SIBLING_ATTRIBUTE}]`).forEach((element) => {
@@ -136,18 +171,7 @@
     return backdrop;
   }
 
-  function clearLayoutMarkers({ removeBackdrop = true } = {}) {
-    currentPlayer?.removeAttribute(PLAYER_ATTRIBUTE);
-
-    for (const element of markedAncestors) {
-      element.removeAttribute(ANCESTOR_ATTRIBUTE);
-    }
-    markedAncestors = [];
-
-    if (removeBackdrop) document.getElementById(BACKDROP_ID)?.remove();
-  }
-
-  function getAncestorPath(player) {
+  function getPlayerAncestorPath(player) {
     const path = [];
     let parent = player?.parentElement ?? null;
 
@@ -159,45 +183,58 @@
     return path;
   }
 
-  function layoutPathIsCurrent(player) {
-    const path = getAncestorPath(player);
-    return currentPlayer === player
+  function isViewportLayoutCurrent(player) {
+    const path = getPlayerAncestorPath(player);
+    return state.viewport.player === player
       && player?.getAttribute(PLAYER_ATTRIBUTE) === "true"
-      && path.length === markedAncestors.length
+      && path.length === state.viewport.ancestors.length
       && path.every((element, index) => (
-        element === markedAncestors[index]
+        element === state.viewport.ancestors[index]
         && element.getAttribute(ANCESTOR_ATTRIBUTE) === "true"
       ));
   }
 
-  function applyLayoutMarkers(player) {
-    clearLayoutMarkers({ removeBackdrop: false });
-    currentPlayer = player;
-    currentPlayer.setAttribute(PLAYER_ATTRIBUTE, "true");
+  function clearViewportLayout({ removeBackdrop = true } = {}) {
+    state.viewport.player?.removeAttribute(PLAYER_ATTRIBUTE);
 
-    markedAncestors = getAncestorPath(player);
-    for (const element of markedAncestors) {
+    for (const element of state.viewport.ancestors) {
+      element.removeAttribute(ANCESTOR_ATTRIBUTE);
+    }
+    state.viewport.ancestors = [];
+
+    if (removeBackdrop) document.getElementById(BACKDROP_ID)?.remove();
+  }
+
+  function applyViewportLayout(player) {
+    clearViewportLayout({ removeBackdrop: false });
+    state.viewport.player = player;
+    state.viewport.player.setAttribute(PLAYER_ATTRIBUTE, "true");
+
+    state.viewport.ancestors = getPlayerAncestorPath(player);
+    for (const element of state.viewport.ancestors) {
       element.setAttribute(ANCESTOR_ATTRIBUTE, "true");
     }
 
     ensureBackdrop();
   }
 
-  function notifyPlayerResize() {
+  function requestPlayerResize() {
     requestAnimationFrame(() => {
       window.dispatchEvent(new Event("resize"));
       requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
     });
   }
 
-  function updateButtonState() {
+  // ---------- 播放器按钮 ----------
+
+  function updateViewportButton() {
     const button = document.getElementById(BUTTON_ID);
     if (!button) return;
 
-    button.innerHTML = active ? EXIT_ICON : ENTER_ICON;
-    button.title = active ? "退出网页全屏（Esc）" : "网页全屏";
+    button.innerHTML = state.viewport.active ? EXIT_ICON : ENTER_ICON;
+    button.title = state.viewport.active ? "退出网页全屏（Esc）" : "网页全屏";
     button.setAttribute("aria-label", button.title);
-    button.setAttribute("aria-pressed", String(active));
+    button.setAttribute("aria-pressed", String(state.viewport.active));
   }
 
   function syncButtonMetrics(button, nativeButton) {
@@ -210,11 +247,11 @@
     }
   }
 
-  function removeButton() {
+  function removeViewportButton() {
     document.getElementById(BUTTON_ID)?.remove();
   }
 
-  function createButton(nativeButton) {
+  function createViewportButton(nativeButton) {
     const button = document.createElement("button");
     const nativeClasses = Array.from(nativeButton.classList)
       .filter((className) => className !== "ytp-fullscreen-button");
@@ -232,8 +269,8 @@
     return button;
   }
 
-  function ensureButtonForPlayer(player) {
-    const controls = findControls(player);
+  function ensureViewportButton(player) {
+    const controls = findRightControls(player);
     const nativeButton = controls?.querySelector(".ytp-fullscreen-button") ?? null;
     const parent = nativeButton?.parentElement ?? null;
     if (!controls || !nativeButton || !parent || !parent.isConnected) return false;
@@ -241,7 +278,7 @@
     let button = document.getElementById(BUTTON_ID);
     if (!button || button.parentElement !== parent) {
       button?.remove();
-      button = createButton(nativeButton);
+      button = createViewportButton(nativeButton);
     }
 
     try {
@@ -251,135 +288,191 @@
     } catch (error) {
       console.warn("[YouTube 网页全屏] 播放器控件正在重建，稍后重试。", error);
       button.remove();
-      scheduleReconcile(120);
+      scheduleRuntimeSync(TIMING.discoveryDelay);
       return false;
     }
 
     syncButtonMetrics(button, nativeButton);
-    updateButtonState();
+    updateViewportButton();
     return true;
   }
 
+  // ---------- DOM 观察器 ----------
+
   function stopDiscoveryObserver() {
-    discoveryObserver?.disconnect();
-    discoveryObserver = null;
+    state.observers.discovery?.disconnect();
+    state.observers.discovery = null;
   }
 
   function startDiscoveryObserver() {
-    if (discoveryObserver || getPageKind() === "unsupported") return;
+    if (state.observers.discovery || getPageKind() === "unsupported") return;
 
     const root = document.body ?? document.documentElement;
-    discoveryObserver = new MutationObserver(() => scheduleReconcile(120));
-    discoveryObserver.observe(root, { childList: true, subtree: true });
+    state.observers.discovery = new MutationObserver(() => {
+      scheduleRuntimeSync(TIMING.discoveryDelay);
+    });
+    state.observers.discovery.observe(root, { childList: true, subtree: true });
   }
 
-  function bindPlayer(player) {
-    const controls = findControls(player);
+  function stopControlsObserver() {
+    state.observers.controls?.disconnect();
+    state.observers.controls = null;
+    state.binding.player = null;
+    state.binding.controlsRoot = null;
+  }
+
+  function observePlayerControls(player) {
+    const controls = findRightControls(player);
     const controlsRoot = player.querySelector(".ytp-chrome-bottom") ?? controls;
 
     if (
-      boundPlayer === player
-      && boundControlsRoot === controlsRoot
+      state.binding.player === player
+      && state.binding.controlsRoot === controlsRoot
       && controlsRoot?.isConnected
     ) {
-      ensureButtonForPlayer(player);
+      ensureViewportButton(player);
       return;
     }
 
-    controlsObserver?.disconnect();
-    controlsObserver = null;
-    boundPlayer = player;
-    boundControlsRoot = controlsRoot;
+    stopControlsObserver();
+    state.binding.player = player;
+    state.binding.controlsRoot = controlsRoot;
 
     if (controlsRoot) {
-      controlsObserver = new MutationObserver(() => scheduleReconcile(80));
-      controlsObserver.observe(controlsRoot, { childList: true, subtree: true });
+      state.observers.controls = new MutationObserver(() => {
+        scheduleRuntimeSync(TIMING.controlsDelay);
+      });
+      state.observers.controls.observe(controlsRoot, { childList: true, subtree: true });
     }
 
-    ensureButtonForPlayer(player);
+    ensureViewportButton(player);
   }
 
-  function clearPlayerBinding() {
-    controlsObserver?.disconnect();
-    controlsObserver = null;
-    boundPlayer = null;
-    boundControlsRoot = null;
+  // ---------- 运行状态同步 ----------
+
+  function resetRuntime({ exitViewport = false, removeButton = false } = {}) {
+    state.missingPlayerSince = 0;
+    stopDiscoveryObserver();
+    stopControlsObserver();
+
+    if (exitViewport && state.viewport.active) exitViewportFullscreen();
+    if (removeButton) removeViewportButton();
   }
 
-  function reconcile() {
+  function syncRuntimeState() {
     if (getPageKind() === "unsupported") {
-      missingPlayerSince = 0;
-      stopDiscoveryObserver();
-      clearPlayerBinding();
-      removeButton();
-      if (active) exitViewportFullscreen();
+      resetRuntime({ exitViewport: true, removeButton: true });
       return;
     }
 
-    const player = findPlayer();
+    const player = findBestPlayer();
     if (!player) {
-      if (!missingPlayerSince) missingPlayerSince = Date.now();
-      clearPlayerBinding();
-      removeButton();
+      if (!state.missingPlayerSince) state.missingPlayerSince = Date.now();
+      stopControlsObserver();
+      removeViewportButton();
       startDiscoveryObserver();
 
-      if (active && Date.now() - missingPlayerSince > 1_500) {
+      // YouTube 切片时播放器会短暂消失，留出重建时间后再退出网页全屏。
+      if (
+        state.viewport.active
+        && Date.now() - state.missingPlayerSince > TIMING.missingPlayerGrace
+      ) {
         exitViewportFullscreen();
       }
       return;
     }
 
-    missingPlayerSince = 0;
+    state.missingPlayerSince = 0;
     stopDiscoveryObserver();
 
-    if (active && !layoutPathIsCurrent(player)) {
-      applyLayoutMarkers(player);
-      notifyPlayerResize();
+    if (state.viewport.active && !isViewportLayoutCurrent(player)) {
+      applyViewportLayout(player);
+      requestPlayerResize();
     }
 
-    bindPlayer(player);
+    observePlayerControls(player);
   }
 
+  function scheduleRuntimeSync(delay = TIMING.popstateDelay) {
+    window.clearTimeout(state.timers.runtimeSync);
+    state.timers.runtimeSync = window.setTimeout(syncRuntimeState, delay);
+  }
+
+  function scheduleViewportLayoutRefresh() {
+    window.clearTimeout(state.timers.viewportRefresh);
+    state.timers.viewportRefresh = window.setTimeout(() => {
+      const player = findBestPlayer();
+      if (state.viewport.active && player) {
+        applyViewportLayout(player);
+        requestPlayerResize();
+      }
+      syncRuntimeState();
+    }, TIMING.viewportDelay);
+  }
+
+  function startHealthCheck() {
+    window.clearInterval(state.timers.healthCheck);
+    state.timers.healthCheck = window.setInterval(() => {
+      if (document.visibilityState === "visible") syncRuntimeState();
+    }, TIMING.healthInterval);
+  }
+
+  function clearTimers() {
+    window.clearTimeout(state.timers.runtimeSync);
+    window.clearTimeout(state.timers.viewportRefresh);
+    window.clearInterval(state.timers.healthCheck);
+    state.timers.runtimeSync = 0;
+    state.timers.viewportRefresh = 0;
+    state.timers.healthCheck = 0;
+  }
+
+  // ---------- 网页全屏状态 ----------
+
   function enterViewportFullscreen() {
-    const player = findPlayer();
-    if (!player || active) return;
+    const player = findBestPlayer();
+    if (!player || state.viewport.active) return;
 
-    savedScrollX = window.scrollX;
-    savedScrollY = window.scrollY;
-    savedFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    active = true;
+    state.viewport.savedScrollX = window.scrollX;
+    state.viewport.savedScrollY = window.scrollY;
+    state.viewport.savedFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    state.viewport.active = true;
 
-    applyLayoutMarkers(player);
+    applyViewportLayout(player);
     document.documentElement.classList.add(ACTIVE_CLASS);
-    document.documentElement.classList.toggle(NATIVE_CLASS, Boolean(document.fullscreenElement));
-    bindPlayer(player);
-    updateButtonState();
-    notifyPlayerResize();
+    document.documentElement.classList.toggle(
+      NATIVE_CLASS,
+      Boolean(document.fullscreenElement)
+    );
+    observePlayerControls(player);
+    updateViewportButton();
+    requestPlayerResize();
   }
 
   function exitViewportFullscreen() {
-    if (!active) return;
+    if (!state.viewport.active) return;
 
-    active = false;
+    state.viewport.active = false;
     document.documentElement.classList.remove(ACTIVE_CLASS, NATIVE_CLASS);
-    clearLayoutMarkers();
-    currentPlayer = null;
-    updateButtonState();
-    notifyPlayerResize();
+    clearViewportLayout();
+    state.viewport.player = null;
+    updateViewportButton();
+    requestPlayerResize();
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        window.scrollTo(savedScrollX, savedScrollY);
-        if (savedFocus?.isConnected) {
-          savedFocus.focus({ preventScroll: true });
+        window.scrollTo(state.viewport.savedScrollX, state.viewport.savedScrollY);
+        if (state.viewport.savedFocus?.isConnected) {
+          state.viewport.savedFocus.focus({ preventScroll: true });
         }
-        savedFocus = null;
+        state.viewport.savedFocus = null;
       });
     });
   }
 
   function toggleViewportFullscreen() {
-    if (active) {
+    if (state.viewport.active) {
       exitViewportFullscreen();
     } else {
       enterViewportFullscreen();
@@ -387,10 +480,11 @@
   }
 
   function hasOpenPlayerPopup() {
-    if (!currentPlayer) return false;
+    const player = state.viewport.player;
+    if (!player) return false;
 
     return Array.from(
-      currentPlayer.querySelectorAll(".ytp-popup, .ytp-contextmenu")
+      player.querySelectorAll(".ytp-popup, .ytp-contextmenu")
     ).some((popup) => {
       const style = getComputedStyle(popup);
       const rect = popup.getBoundingClientRect();
@@ -403,91 +497,85 @@
   }
 
   function syncNativeFullscreenState() {
-    document.documentElement.classList.toggle(NATIVE_CLASS, Boolean(document.fullscreenElement));
+    document.documentElement.classList.toggle(
+      NATIVE_CLASS,
+      Boolean(document.fullscreenElement)
+    );
 
-    if (active && !document.fullscreenElement) {
-      const player = findPlayer();
-      if (player && !layoutPathIsCurrent(player)) applyLayoutMarkers(player);
-      notifyPlayerResize();
+    if (state.viewport.active && !document.fullscreenElement) {
+      const player = findBestPlayer();
+      if (player && !isViewportLayoutCurrent(player)) applyViewportLayout(player);
+      requestPlayerResize();
     }
 
-    updateButtonState();
+    updateViewportButton();
   }
 
-  function scheduleReconcile(delay = 100) {
-    window.clearTimeout(reconcileTimer);
-    reconcileTimer = window.setTimeout(reconcile, delay);
+  // ---------- 事件与生命周期 ----------
+
+  function handleKeydown(event) {
+    if (
+      event.key !== "Escape"
+      || !state.viewport.active
+      || document.fullscreenElement
+      || hasOpenPlayerPopup()
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    exitViewportFullscreen();
   }
 
-  function scheduleViewportRefresh() {
-    window.clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(() => {
-      const player = findPlayer();
-      if (active && player) {
-        applyLayoutMarkers(player);
-        notifyPlayerResize();
-      }
-      reconcile();
-    }, 100);
-  }
-
-  function startHealthCheck() {
-    window.clearInterval(healthTimer);
-    healthTimer = window.setInterval(() => {
-      if (document.visibilityState === "visible") reconcile();
-    }, 5_000);
-  }
-
-  document.addEventListener(
-    "keydown",
-    (event) => {
-      if (
-        event.key !== "Escape"
-        || !active
-        || document.fullscreenElement
-        || hasOpenPlayerPopup()
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      exitViewportFullscreen();
-    },
-    true
-  );
-
-  document.addEventListener("fullscreenchange", syncNativeFullscreenState);
-  document.addEventListener("yt-navigate-start", () => {
+  function handleNavigationStart() {
     stopDiscoveryObserver();
-    clearPlayerBinding();
-    scheduleReconcile(0);
-  });
-  document.addEventListener("yt-navigate-finish", () => scheduleReconcile(150));
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") scheduleReconcile(0);
-  });
+    stopControlsObserver();
+    scheduleRuntimeSync(0);
+  }
 
-  window.addEventListener("resize", (event) => {
-    if (event.isTrusted) scheduleViewportRefresh();
-  });
-  window.addEventListener("popstate", () => scheduleReconcile(100));
-  window.addEventListener(
-    "pagehide",
-    () => {
-      window.clearTimeout(reconcileTimer);
-      window.clearTimeout(resizeTimer);
-      window.clearInterval(healthTimer);
-      stopDiscoveryObserver();
-      clearPlayerBinding();
-      if (active) exitViewportFullscreen();
-      removeButton();
-      clearLegacyMarkers();
-    },
-    { once: true }
-  );
+  function handleVisibilityChange() {
+    if (document.visibilityState === "visible") scheduleRuntimeSync(0);
+  }
 
-  clearLegacyMarkers();
-  startHealthCheck();
-  reconcile();
+  function handleWindowResize(event) {
+    // requestPlayerResize() 派发的是合成事件，只处理用户真实调整窗口产生的 resize。
+    if (event.isTrusted) scheduleViewportLayoutRefresh();
+  }
+
+  function handlePageHide() {
+    clearTimers();
+    stopDiscoveryObserver();
+    stopControlsObserver();
+    if (state.viewport.active) exitViewportFullscreen();
+    removeViewportButton();
+    clearLegacyMarkers();
+  }
+
+  function registerEventListeners() {
+    document.addEventListener("keydown", handleKeydown, true);
+    document.addEventListener("fullscreenchange", syncNativeFullscreenState);
+    document.addEventListener("yt-navigate-start", handleNavigationStart);
+    document.addEventListener("yt-navigate-finish", () => {
+      scheduleRuntimeSync(TIMING.navigationDelay);
+    });
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    window.addEventListener("resize", handleWindowResize);
+    window.addEventListener("popstate", () => {
+      scheduleRuntimeSync(TIMING.popstateDelay);
+    });
+    window.addEventListener("pagehide", handlePageHide, { once: true });
+  }
+
+  // ---------- 启动 ----------
+
+  function initialize() {
+    clearLegacyMarkers();
+    registerEventListeners();
+    startHealthCheck();
+    syncRuntimeState();
+  }
+
+  initialize();
 })();
