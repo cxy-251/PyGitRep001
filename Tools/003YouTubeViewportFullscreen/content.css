@@ -1,10 +1,18 @@
-html.yt-vfs-active:not(.yt-vfs-native-fullscreen),
-html.yt-vfs-active:not(.yt-vfs-native-fullscreen) body {
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen),
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) body {
   overflow: hidden !important;
   overscroll-behavior: none !important;
 }
 
-html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-ancestor="true"] {
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) ytd-app,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #content,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #page-manager,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) ytd-watch-flexy,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #columns,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #primary,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) #primary-inner,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) ytd-player,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen) ytd-reel-video-renderer {
   transform: none !important;
   filter: none !important;
   perspective: none !important;
@@ -12,13 +20,12 @@ html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-ancestor="true"] 
   overflow: visible !important;
   clip: auto !important;
   clip-path: none !important;
-  mask: none !important;
 }
 
-html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] {
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
+  #movie_player[data-yt-webpage-fullscreen="true"] {
   position: fixed !important;
   inset: 0 !important;
-  display: block !important;
   width: 100vw !important;
   height: 100vh !important;
   min-width: 0 !important;
@@ -27,26 +34,28 @@ html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] {
   max-height: none !important;
   margin: 0 !important;
   padding: 0 !important;
-  border: 0 !important;
-  z-index: 2147483646 !important;
+  z-index: 2147483647 !important;
   background: #000 !important;
-  isolation: isolate !important;
-  transform: none !important;
   overflow: hidden !important;
 }
 
-html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] > #container,
-html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] #movie_player,
-html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] .html5-video-container {
-  width: 100% !important;
-  height: 100% !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
+  #movie_player[data-yt-webpage-fullscreen="true"] .html5-video-container,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
+  #movie_player[data-yt-webpage-fullscreen="true"] .ytp-player-content,
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
+  #movie_player[data-yt-webpage-fullscreen="true"] .ytp-chrome-bottom {
   max-width: none !important;
-  max-height: none !important;
 }
 
-html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] video.html5-main-video {
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
+  #movie_player[data-yt-webpage-fullscreen="true"] .html5-video-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+html.yt-webpage-fullscreen-active:not(.yt-webpage-native-fullscreen)
+  #movie_player[data-yt-webpage-fullscreen="true"] video.html5-main-video {
   position: absolute !important;
   inset: 0 !important;
   width: 100% !important;
@@ -60,11 +69,12 @@ html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] vi
   object-position: center center !important;
 }
 
-.yt-vfs-player-button {
+#yt-webpage-fullscreen-button {
   position: relative !important;
+  width: 48px !important;
 }
 
-.yt-vfs-player-button svg {
+#yt-webpage-fullscreen-button svg {
   width: 100%;
   height: 100%;
   padding: 11px;
@@ -73,7 +83,7 @@ html.yt-vfs-active:not(.yt-vfs-native-fullscreen) [data-yt-vfs-target="true"] vi
   pointer-events: none;
 }
 
-.yt-vfs-player-button[aria-pressed="true"]::after {
+#yt-webpage-fullscreen-button[aria-pressed="true"]::after {
   content: "";
   position: absolute;
   left: 12px;
