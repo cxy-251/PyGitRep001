@@ -38,6 +38,17 @@
     return player?.querySelector(".ytp-right-controls") ?? null;
   }
 
+  function findDirectChildAnchor(parent, descendant) {
+    if (!descendant || !parent.contains(descendant)) return null;
+
+    let anchor = descendant;
+    while (anchor.parentElement && anchor.parentElement !== parent) {
+      anchor = anchor.parentElement;
+    }
+
+    return anchor.parentElement === parent ? anchor : null;
+  }
+
   function notifyPlayerResize() {
     requestAnimationFrame(() => {
       window.dispatchEvent(new Event("resize"));
@@ -59,6 +70,18 @@
     document.getElementById(BUTTON_ID)?.remove();
   }
 
+  function insertButton(controls, button) {
+    const nativeFullscreenButton = controls.querySelector(".ytp-fullscreen-button");
+    const anchor = findDirectChildAnchor(controls, nativeFullscreenButton);
+
+    if (anchor?.parentNode === controls) {
+      controls.insertBefore(button, anchor);
+      return;
+    }
+
+    controls.appendChild(button);
+  }
+
   function ensureButton() {
     if (!isSupportedPage()) {
       if (active) exitViewportFullscreen();
@@ -68,7 +91,7 @@
 
     const player = findPlayer();
     const controls = findControls(player);
-    if (!player || !controls) return;
+    if (!player || !controls || !controls.isConnected) return;
 
     if (active && currentPlayer !== player) {
       currentPlayer?.removeAttribute(PLAYER_ATTRIBUTE);
@@ -90,8 +113,14 @@
         toggleViewportFullscreen();
       });
 
-      const nativeFullscreenButton = controls.querySelector(".ytp-fullscreen-button");
-      controls.insertBefore(button, nativeFullscreenButton);
+      try {
+        insertButton(controls, button);
+      } catch (error) {
+        console.warn("[YouTube 网页全屏] 播放器控件正在重建，稍后重试。", error);
+        button.remove();
+        scheduleReconcile(100);
+        return;
+      }
     }
 
     updateButtonState();
