@@ -8,12 +8,14 @@
 
 ## 支持范围
 
-支持普通视频、播放列表、直播、广告阶段、YouTube 站内换片和 Shorts。网页全屏期间会隔离当前播放器的真实祖先路径，隐藏推荐流、评论区和页面其他兄弟区域，保留播放器字幕、控制栏、设置菜单和原生全屏功能。退出原生全屏后会恢复网页全屏状态。
+支持普通视频、播放列表、直播、广告阶段、YouTube 站内换片和 Shorts。网页全屏使用独立黑色遮罩覆盖推荐流、评论区和其他页面内容，不再隐藏或修改这些页面节点。窗口宽度变化时会重新确认当前播放器和真实祖先链，避免 YouTube 响应式重排后出现黑屏。
+
+网页全屏期间保留播放器字幕、控制栏、设置菜单和原生全屏功能。退出原生全屏后会恢复网页全屏状态。
 
 ## 安全与性能
 
-扩展不解析视频地址、不读取网络请求、不访问第三方服务，不申请额外权限，只在 `https://www.youtube.com/*` 注入本地 `content.js` 和 `content.css`。播放器发现完成后，仅观察当前播放器 DOM，并使用低频健康检查处理 YouTube 控件重建。
+扩展不解析视频地址、不读取网络请求、不访问第三方服务，不申请额外权限，只在 `https://www.youtube.com/*` 注入本地 `content.js` 和 `content.css`。播放器发现完成后，仅观察控制栏区域，并使用低频健康检查处理 YouTube 控件重建。
 
 ## 维护说明
 
-YouTube DOM 不是公开稳定接口。当前实现以 `/watch`、`/shorts/`、`#movie_player`、`.ytp-right-controls` 和 `.ytp-fullscreen-button` 为主要定位点。普通视频优先选择 `ytd-watch-flexy` 中的播放器；Shorts 结合播放状态、可见面积和视口中心距离选择当前播放器。YouTube 大规模调整播放器结构时仍可能需要更新选择器。
+YouTube DOM 不是公开稳定接口。当前实现以 `/watch`、`/shorts/`、`#movie_player`、`.ytp-right-controls` 和 `.ytp-fullscreen-button` 为主要定位点。普通视频优先选择 `ytd-watch-flexy` 中的播放器；Shorts 结合播放状态、活动 renderer、可见面积和视口中心距离选择当前播放器。按钮与原生全屏按钮插入同一父节点，并同步其实际宽高。YouTube 大规模调整播放器结构时仍可能需要更新选择器。
