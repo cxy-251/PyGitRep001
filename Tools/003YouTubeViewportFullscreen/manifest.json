@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "YouTube 网页全屏",
   "short_name": "YT 网页全屏",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "在 YouTube 播放器控制栏增加网页全屏按钮，保留浏览器标签栏和地址栏，按 Esc 退出。",
   "minimum_chrome_version": "120",
   "content_scripts": [
