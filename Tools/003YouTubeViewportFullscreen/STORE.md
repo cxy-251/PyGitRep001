@@ -107,13 +107,13 @@ YouTube is a trademark of Google LLC. This extension is not affiliated with or e
 
 ## 发布步骤
 
-在扩展目录中执行：
+仅在需要发布到 Chrome Web Store 时，在扩展目录中执行：
 
 ```powershell
-pwsh -File .\scripts\build-store-package.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-store-package.ps1
 ```
 
-脚本会：
+该命令使用 Windows 自带的 Windows PowerShell，不要求安装 PowerShell 7。脚本会：
 
 1. 生成 16、32、48、128 像素 PNG 图标；
 2. 生成 128×128 商店图标和 440×280 小型宣传图；
