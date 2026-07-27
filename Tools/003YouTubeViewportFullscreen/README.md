@@ -1,8 +1,8 @@
-# YouTube 网页全屏
+# 网页全屏助手 for YouTube™
 
 这是一个可直接加载的 Chrome Manifest V3 扩展。它在 YouTube 原播放器控制栏中、系统全屏按钮左侧增加“网页全屏”按钮；点击后播放器铺满当前网页内容区，Chrome 标签栏、地址栏和窗口边框保持可见；按 `Esc` 或再次点击按钮退出并恢复原页面位置。
 
-## 安装
+## 安装与更新
 
 打开 `chrome://extensions`，开启“开发者模式”，点击“加载已解压的扩展程序”，选择当前目录。更新文件后，需要在扩展页面点击“重新加载”，并刷新已经打开的 YouTube 标签页。
 
@@ -14,17 +14,39 @@
 
 ## 文件结构
 
-- `manifest.json`：扩展入口、版本和注入范围。
+- `manifest.json`：扩展入口、版本、商店名称和注入范围。
 - `content.js`：页面识别、播放器选择、按钮管理、网页全屏状态、DOM 观察器和生命周期。
 - `content.css`：遮罩、播放器视口布局和按钮尺寸同步。
+- `PRIVACY.md`：公开隐私政策。
+- `STORE.md`：Chrome Web Store 文案、审核字段和发布清单。
+- `assets/icon-source.svg`：原创图标源稿，不直接用于 manifest。
+- `scripts/build-store-package.ps1`：生成 PNG 图标并创建商店 ZIP。
 
 `content.js` 保持单文件和零依赖，按“常量、运行状态、播放器识别、网页全屏布局、按钮、观察器、状态同步、生命周期、启动入口”分区。所有可变运行状态集中在 `state` 对象中，便于统一清理和后续维护。
 
 ## 安全与性能
 
-扩展不解析视频地址、不读取网络请求、不访问第三方服务，不申请额外权限，只在 `https://www.youtube.com/*` 注入本地 `content.js` 和 `content.css`。
+扩展不解析视频地址、不读取网络请求、不访问第三方服务，不申请额外 Chrome API 权限，只在 `https://www.youtube.com/*` 注入本地 `content.js` 和 `content.css`。
 
 找到播放器后只观察播放器控制栏区域；播放器暂时不存在时才启用页面发现观察器。另有每 5 秒一次的低频健康检查，用于处理 YouTube 控件重建和站内导航。
+
+完整隐私说明见 [PRIVACY.md](./PRIVACY.md)。
+
+## Chrome Web Store 发布包
+
+在当前目录执行：
+
+```powershell
+pwsh -File .\scripts\build-store-package.ps1
+```
+
+脚本会生成商店要求使用的 PNG 图标，把图标配置写入临时发布 manifest，并输出：
+
+```text
+.store-build/viewport-fullscreen-for-youtube-v<版本号>.zip
+```
+
+源目录不会写入二进制图标或构建产物。商店说明、截图要求、隐私字段和提交检查见 [STORE.md](./STORE.md)。
 
 ## 回归检查
 
@@ -44,4 +66,8 @@
 
 YouTube DOM 不是公开稳定接口。当前实现以 `/watch`、`/shorts/`、`#movie_player`、`.ytp-right-controls` 和 `.ytp-fullscreen-button` 为主要定位点。普通视频优先选择 `ytd-watch-flexy` 中的播放器；Shorts 结合播放状态、活动 renderer、可见面积和视口中心距离选择当前播放器。按钮与原生全屏按钮插入同一父节点，并同步其实际宽高。
 
-`data-yt-webpage-fullscreen-sibling` 仅用于清理 `1.2.0` 遗留标记，可在后续确认不再需要兼容旧页面后删除。YouTube 大规模调整播放器结构时仍可能需要更新选择器。
+`data-yt-webpage-fullscreen-sibling` 仅用于清理 `1.2.0` 遗留标记，可在后续确认不再需要兼容旧页面后删除。
+
+## 商标声明
+
+YouTube is a trademark of Google LLC. This extension is not affiliated with or endorsed by Google LLC.
