@@ -81,9 +81,7 @@ function Write-ViewportIcon {
             $canvasSize - (2 * $padding),
             $canvasSize - (2 * $padding)
         )
-        $backgroundPath = New-RoundedRectanglePath \
-            -Rectangle $backgroundRect \
-            -Radius ([single]($canvasSize * 0.1875))
+        $backgroundPath = New-RoundedRectanglePath -Rectangle $backgroundRect -Radius ([single]($canvasSize * 0.1875))
         $backgroundColor = [System.Drawing.ColorTranslator]::FromHtml("#202124")
         $backgroundBrush = [System.Drawing.SolidBrush]::new($backgroundColor)
         $largeGraphics.FillPath($backgroundBrush, $backgroundPath)
@@ -164,9 +162,7 @@ foreach ($fileName in @("content.js", "content.css")) {
 }
 
 foreach ($size in @(16, 32, 48, 128)) {
-    Write-ViewportIcon \
-        -Size $size \
-        -Destination (Join-Path $iconsRoot "icon$size.png")
+    Write-ViewportIcon -Size $size -Destination (Join-Path $iconsRoot "icon$size.png")
 }
 
 $manifest = Get-Content $manifestSource -Raw | ConvertFrom-Json
