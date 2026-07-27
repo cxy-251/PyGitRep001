@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 import os
 import shutil
@@ -6,6 +7,7 @@ import subprocess
 import json
 import time
 import random
+import chardet
 from urllib.parse import urlparse
 from utils.disk_checker import check_disk_space
 from utils.stats_collector import StatsCollector
@@ -129,9 +131,26 @@ class Downloader:
         # 获取文件名
         cmd_check_filename = ["yt-dlp", url, "--output", final_path,] + ["--cookies", self.config.data["cookies_file"]] + ["--print", "filename"] + ["--merge-output-format", "mp4"]
         result = subprocess.run(cmd_check_filename, capture_output=True, 
-                                # encoding='utf-8')
+                                # encoding='utf-8',
                                 text=True)
+                                # text=False) # 以字节流返回输出，避免直接按 utf-8 解码 # 字节流返回后用对应的编码方式解码, 还是不对
+                                # encoding='utf-8', 
+                                # errors='replace'  # 无法解码的字符会被替代
+                                # ) # 依旧乱码
+        
+        # # 使用 chardet 检测编码
+        # detected_encoding = chardet.detect(result.stdout)['encoding']
+        # self.logger.info(f"检测到的编码: {detected_encoding}")
+
+        # # 根据检测到的编码解码输出
+        # stdout_raw = result.stdout.decode(detected_encoding)
+        # self.logger.info(f"原始输出：{repr(stdout_raw)}")  # 打印原始输出，确认是否包含韩文字符
+
+        # filename = os.path.basename(stdout_raw)
+        # self.logger.info(f"文件名：{repr(filename)}")
+        
         filename = os.path.basename(result.stdout.strip())
+        self.logger.info(f"准备下载filename: {filename}")
         # filename = re.search(r'[^\\]+\.webm', stdout.strip()).group(0)
         try:
             subprocess.run(cmd, check=True, capture_output=True)
@@ -141,8 +160,8 @@ class Downloader:
             needBeMovedFilepath = os.path.join(target_dir, filename)
 
             if not os.path.exists(needBeMovedFilepath):
-                self.logger.info(f"移动文件跳过（文件下载过了）")
-                return True  # 文件不存在, 视为文件下载过了
+                self.logger.info(f"移动文件跳过（文件没找到）{needBeMovedFilepath}")
+                return True  # 文件不存在, 视为文件下载过了 # 或者文件路径不存在, 文件名编码有问题
             
             # 检查文件是否正在被使用
             if Downloader.is_file_in_use(needBeMovedFilepath):
@@ -159,7 +178,7 @@ class Downloader:
                 width, height = map(int, result.stdout.strip().split(","))
 
                 # 在当前子文件夹中创建ABC文件夹
-                abc_folder = os.path.join(folder_name, 'ABC')
+                abc_folder = os.path.join(target_dir, 'ABC')
                 os.makedirs(abc_folder, exist_ok=True)
 
                 # 创建分辨率文件夹并放入ABC子文件夹中
@@ -181,13 +200,72 @@ class Downloader:
         except subprocess.CalledProcessError as e:
             stderr = e.stderr or b""
             if b"DRM" in e.stderr or b"Protected" in stderr:
-                self.logger.warning(f"检测到DRM保护, 使用安全格式重试...: {url}")
-                cmd2 += ["-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best", "--merge-output-format", "mp4"]
+                self.logger.warning(f"检测到DRM保护, 使用安全格式重试...: {url}, and reget_cookies")
+                cmd2 += ["-f", "bestvideo+bestaudio", "--merge-output-format", "mp4"]
+                # cmd2 += ["--extractor-args", "youtube:player-client=web;web_ver=3"] // Your account may have the SSAP (server-side ads) experiment which interferes with yt-dlp.
+                # Some tv client https formats have been skipped as they are DRM protected. Your account may have an experiment that applies DRM to all videos on the tv client.
+                # 开个会员就好了
                 self.use_safty_cmd_DRM += 1
+                # reget_cookies(self.config, self.logger)
                 try:
                     subprocess.run(cmd2, check=True)
                     self.logger.info(f"使用安全格式下载成功: {url}, 遇到DRM保护, 但是下载成功的次数：{self.use_safty_cmd_DRM}")
                     self.stats.success += 1
+                    
+                    
+                            
+                    # # 获取文件名
+                    # cmd_check_filename = ["yt-dlp", url, "--output", final_path,] + ["--cookies", self.config.data["cookies_file"]] + ["--print", "filename"] + ["--merge-output-format", "mp4"]
+                    # result = subprocess.run(cmd_check_filename, capture_output=True, 
+                    #                         # encoding='utf-8')
+                    #                         text=True)
+                    # filename = os.path.basename(result.stdout.strip())
+                    
+                    needBeMovedFilepath = os.path.join(target_dir, filename)
+
+                    if not os.path.exists(needBeMovedFilepath):
+                        self.logger.info(f"移动文件跳过（文件下载过了）{needBeMovedFilepath}")
+                        return True  # 文件不存在, 视为文件下载过了
+                    
+                    # 检查文件是否正在被使用
+                    if Downloader.is_file_in_use(needBeMovedFilepath):
+                        self.logger.info(f"移动文件跳过（文件正在使用）{filename} \n {needBeMovedFilepath} \n {result}")
+                        return True
+
+                    # 获取视频分辨率, 限制 5 秒超时
+                    cmd_resolution = [
+                        "ffprobe", "-v", "error", "-select_streams", "v:0",
+                        "-show_entries", "stream=width,height", "-of", "csv=p=0", needBeMovedFilepath
+                    ]
+                    try:
+                        result = subprocess.run(cmd_resolution, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
+                        width, height = map(int, result.stdout.strip().split(","))
+
+                        # 在当前子文件夹中创建ABC文件夹
+                        abc_folder = os.path.join(target_dir, 'ABC')
+                        os.makedirs(abc_folder, exist_ok=True)
+
+                        # 创建分辨率文件夹并放入ABC子文件夹中
+                        resolution_folder = os.path.join(abc_folder, f"{width}x{height}")
+                        os.makedirs(resolution_folder, exist_ok=True)
+
+                        # 移动文件到目标文件夹
+                        shutil.move(needBeMovedFilepath, os.path.join(resolution_folder, filename))
+                        self.logger.info(f"移动文件成功{filename}")
+                        # print(f"已移动: {filename} → {resolution_folder}/")
+
+                    except subprocess.TimeoutExpired:
+                        print(f"跳过（FFprobe 超时）: {filename}")
+
+                    except ValueError:
+                        print(f"跳过（无法获取分辨率）: {filename}")
+                    
+                    
+                    
+                    
+                    
+                    
+                    
                     return True
                 except subprocess.CalledProcessError:
                     self.logger.warning(f"使用安全格式重试仍然失败: {url}")
