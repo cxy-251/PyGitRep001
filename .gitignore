@@ -1,5 +1,8 @@
-# Local audit and temporary notes
+# Local audit and generated reports
 repo-audit.txt
+rename-map-*.json
+file_tree.json
+kuaishou_videos.json
 
 # Python
 __pycache__/
@@ -35,8 +38,8 @@ ConfigPrivate/
 *.exe
 .store-build/
 
-# Generated/downloaded archive data: existing tracked files remain in history,
-# while new local output under these paths is not added accidentally.
+# Generated/downloaded archive data. Existing tracked files stay in Git history;
+# new local output under these paths is ignored.
 downloads/
 Tools/005YTProjMerge/music2/
 Tools/004Kwai/快手_files/
