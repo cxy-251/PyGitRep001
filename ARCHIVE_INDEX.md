@@ -1,7 +1,7 @@
 # PyGitRep001 功能—代码总表
 
 > 整理日期：2026-07-27  
-> 混合 Notebook、重复下载器和零散实验已按“一个明确功能一个文件”提取；新的浏览器扩展继续独立开发。
+> 仓库中的混合 Notebook、重复下载器和零散实验已按“一个明确功能一个文件”提取。总表优先链接 `archive_tools/` 中的独立脚本。
 
 ## 使用规则
 
@@ -9,13 +9,6 @@
 - 带 `--apply`、`--move`、`--overwrite` 或 `--replace-source` 的操作，先使用副本测试。
 - FFmpeg、yt-dlp、Playwright、浏览器 Cookie 和网站 DOM 可能随版本变化。
 - Cookie、OAuth token 和客户端密钥属于敏感信息，不要提交。
-
-## 浏览器扩展
-
-| 功能 | 代码 | 状态 |
-|---|---|---|
-| 快手发布辅助、BOSS 职位整理、X 时间线提示词提取 | [`Tools/006ChromeWorkflowAssistant/`](Tools/006ChromeWorkflowAssistant/) | 当前开发，Manifest V3 原型 |
-| YouTube 网页全屏并保留浏览器界面 | [`Tools/003YouTubeViewportFullscreen/`](Tools/003YouTubeViewportFullscreen/) | 已完成归档成品 |
 
 ## 媒体：检查、转换与整理
 
@@ -86,6 +79,12 @@
 | 本地音乐播放器 | [`music_player_pyqt5.py`](archive_tools/gui/music_player_pyqt5.py) | PyQt5 Multimedia |
 | 待办事项示例 | [`todo_kivy.py`](archive_tools/gui/todo_kivy.py) | Kivy 进程内示例 |
 
+## 浏览器扩展
+
+| 功能 | 代码 | 状态 |
+|---|---|---|
+| YouTube 网页全屏并保留浏览器界面 | [`Tools/003YouTubeViewportFullscreen/`](Tools/003YouTubeViewportFullscreen/) | 已完成归档成品 |
+
 ## 设置备忘与学习内容
 
 | 内容 | 代码 | 说明 |
@@ -107,4 +106,13 @@
 
 ## 已删除的旧容器
 
-下列内容的有效功能已提取，因此不再作为当前分支入口：多功能媒体 Notebook、YouTube 视频/音乐/Watch Later 实验 Notebook、v1–v4 重复批量下载器、电话号码与 TDD 代码生成混合 Notebook、GUI 杂项 Notebook，以及根目录临时测试和无关文章。这些文件仍可从 Git 历史恢复。
+下列内容的有效功能已提取，因此不再作为当前分支入口：
+
+- 多功能媒体 Notebook；
+- YouTube 视频、音乐和 Watch Later 实验 Notebook；
+- v1/v2/v3/v4 重复批量下载器；
+- 电话号码与 TDD 代码生成混合 Notebook；
+- GUI 杂项 Notebook；
+- 根目录临时测试和无关文章。
+
+这些文件仍可从 Git 历史恢复。
