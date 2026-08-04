@@ -1,53 +1,31 @@
 # 隐私政策 / Privacy Policy
 
-最后更新 / Last updated: 2026-07-27
+最后更新 / Last updated: 2026-08-04
 
 ## 中文
 
-### 适用范围
+本政策适用于 Chrome 扩展“网页视口全屏助手”。
 
-本政策适用于 Chrome 扩展“网页全屏助手 for YouTube™”。
+扩展具有两种运行方式：
 
-### 本地处理的数据
+- YouTube 页面会加载本地专用脚本，用于提供播放器控制栏中的网页全屏按钮；
+- 其他普通网页只有在用户点击扩展图标时，才通过 `activeTab` 临时注入本地元素选择脚本。
 
-为了定位当前播放器并实现网页全屏，扩展会在用户打开 YouTube 页面时，仅在浏览器本地读取：
-
-- 当前页面路径，用于判断普通视频页或 Shorts 页面；
-- 页面中的播放器和控制栏 DOM 结构；
-- 播放器是否可见、是否正在播放以及原生全屏状态。
-
-这些信息只用于在当前标签页中实现扩展功能。
-
-### 不收集、不传输
+为了实现功能，扩展会在当前标签页本地读取目标元素及其祖先 DOM、尺寸、可见状态、滚动位置和焦点状态。这些信息仅用于选择目标、调整布局以及退出时恢复页面。
 
 扩展不会：
 
-- 收集、保存或上传浏览历史、账号信息、搜索内容、视频标题或观看记录；
+- 收集、保存或上传浏览历史、账号信息、搜索内容或网页内容；
+- 读取 Cookie、认证信息或网络请求；
 - 使用分析、广告、跟踪或遥测服务；
-- 向开发者或任何第三方发送页面内容或播放器状态；
-- 出售或共享用户数据。
+- 向开发者或第三方发送数据；
+- 加载或执行远程代码。
 
-扩展没有后台服务器，也不发起第三方网络请求。
+扩展申请 `activeTab` 和 `scripting` 权限，仅用于响应用户点击，在当前普通 HTTP/HTTPS 标签页中临时注入扩展自带的 JavaScript 和 CSS。扩展没有后台服务器，不持久化网页内容；运行状态在页面刷新或关闭后清除。
 
-### 权限范围
-
-扩展只在 `https://www.youtube.com/*` 页面注入本地脚本和样式，用于增加网页全屏按钮并调整当前播放器布局。扩展不申请额外的 Chrome API 权限。
-
-### 数据保留
-
-扩展不建立用户数据库，也不持久化上述页面或播放器信息。网页全屏状态仅存在于当前标签页运行期间，页面关闭或刷新后即被清除。
-
-### 政策更新
-
-功能或数据处理方式发生实质变化时，本政策会同步更新，并修改顶部日期。
-
-### 联系与支持
-
-请通过仓库 Issues 提交问题：
+联系与支持：
 
 https://github.com/cxy-251/PyGitRep001/issues
-
-### 商标声明
 
 YouTube is a trademark of Google LLC. This extension is not affiliated with or endorsed by Google LLC.
 
@@ -55,49 +33,27 @@ YouTube is a trademark of Google LLC. This extension is not affiliated with or e
 
 ## English
 
-### Scope
+This policy applies to the Chrome extension “Viewport Fullscreen Assistant”.
 
-This policy applies to the Chrome extension “Viewport Fullscreen for YouTube™”.
+The extension has two operating modes:
 
-### Data processed locally
+- A local YouTube-specific script provides the viewport-fullscreen button inside the player controls;
+- On other regular webpages, the generic element picker is injected temporarily only after the user clicks the extension action, using the `activeTab` permission.
 
-To locate the active player and provide viewport fullscreen, the extension reads the following information locally in the browser while the user is on YouTube:
-
-- The current page path, to distinguish regular watch pages from Shorts pages;
-- The player and control-bar DOM structure;
-- Whether the player is visible or playing, and whether native fullscreen is active.
-
-This information is used only to provide the extension’s functionality in the current tab.
-
-### No collection or transmission
+To provide the feature, the extension locally reads the selected element and ancestor DOM, element dimensions and visibility, scroll position, and focus state. This information is used only to select the target, adjust its layout, and restore the page on exit.
 
 The extension does not:
 
-- Collect, store, or upload browsing history, account information, searches, video titles, or watch history;
+- Collect, store, or upload browsing history, account information, searches, or webpage content;
+- Read cookies, authentication data, or network requests;
 - Use analytics, advertising, tracking, or telemetry services;
-- Send page content or player state to the developer or any third party;
-- Sell or share user data.
+- Send data to the developer or third parties;
+- Load or execute remote code.
 
-The extension has no backend server and makes no third-party network requests.
+The `activeTab` and `scripting` permissions are used only in response to an explicit user action to inject bundled JavaScript and CSS into the current regular HTTP/HTTPS tab. The extension has no backend server and does not persist webpage content. Runtime state is cleared when the page is refreshed or closed.
 
-### Permission scope
-
-The extension injects local scripts and styles only on `https://www.youtube.com/*` to add the viewport-fullscreen control and adjust the current player layout. It requests no additional Chrome API permissions.
-
-### Data retention
-
-The extension does not maintain a user database or persist page or player information. Runtime state exists only in the current tab and is cleared when the page is refreshed or closed.
-
-### Policy changes
-
-If the extension’s functionality or data practices materially change, this policy and the date above will be updated.
-
-### Contact and support
-
-Please use the repository issue tracker:
+Contact and support:
 
 https://github.com/cxy-251/PyGitRep001/issues
-
-### Trademark notice
 
 YouTube is a trademark of Google LLC. This extension is not affiliated with or endorsed by Google LLC.
