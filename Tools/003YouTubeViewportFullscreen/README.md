@@ -1,75 +1,66 @@
-# 网页全屏助手 for YouTube™
+# 网页视口全屏助手
 
-这是一个可直接加载的 Chrome Manifest V3 扩展。它在 YouTube 原播放器控制栏中、系统全屏按钮左侧增加“网页全屏”按钮；点击后播放器铺满当前网页内容区，Chrome 标签栏、地址栏和窗口边框保持可见；按 `Esc` 或再次点击按钮退出并恢复原页面位置。
+Chrome Manifest V3 扩展。它可以把任意普通网页中的视频、图片、`iframe`、Canvas、文档区域或其他选定元素铺满浏览器内容区，同时保留 Chrome 标签栏、地址栏和窗口边框。
+
+YouTube 继续保留原播放器控制栏中的专用“网页全屏”按钮。
 
 ## 安装与更新
 
-打开 `chrome://extensions`，开启“开发者模式”，点击“加载已解压的扩展程序”，选择当前目录。更新文件后，需要在扩展页面点击“重新加载”，并刷新已经打开的 YouTube 标签页。
+1. 打开 `chrome://extensions`；
+2. 开启“开发者模式”；
+3. 点击“加载已解压的扩展程序”；
+4. 选择当前目录；
+5. 更新代码后，在扩展页面点击“重新加载”，并刷新已打开的网页。
+
+## 普通网页使用
+
+1. 打开任意 `http://` 或 `https://` 网页；
+2. 点击 Chrome 工具栏中的“网页视口全屏助手”；
+3. 鼠标移动时，蓝色框会标出当前候选区域；
+4. 点击目标区域进入网页视口全屏；
+5. 按 `Esc` 或再次点击扩展图标退出。
+
+选择模式支持：
+
+- `↑`：选择当前元素的父级容器；
+- `Enter`：确认当前候选区域；
+- `Esc`：取消选择。
+
+## YouTube 使用
+
+普通视频、播放列表、直播和 Shorts 仍可直接点击播放器控制栏中、原生全屏按钮左侧的网页全屏按钮。也可以点击扩展工具栏图标，手动选择 YouTube 页面中的任意区域。
+
+## 工作原理
+
+通用模式只在用户点击扩展图标后，通过 `activeTab` 和 `scripting` 临时注入当前标签页：
+
+- `service-worker.js`：响应工具栏动作并注入通用运行时；
+- `generic.js`：元素选择、进入和退出、滚动与焦点恢复；
+- `generic.css`：解除祖先裁剪、添加遮罩并固定目标区域；
+- `content.js` / `content.css`：原有 YouTube 专用播放器适配。
+
+扩展不会永久读取所有网站，也不读取网络请求、Cookie 或账号信息。
 
 ## 支持范围
 
-支持普通视频、播放列表、直播、广告阶段、YouTube 站内换片和 Shorts。网页全屏使用独立黑色遮罩覆盖推荐流、评论区和其他页面内容，不隐藏或修改这些页面节点。窗口宽度变化时会重新确认当前播放器和真实祖先链，避免 YouTube 响应式重排后出现黑屏。
+支持大多数普通 HTTP/HTTPS 网页。以下页面受 Chrome 限制，不能注入扩展脚本：
 
-网页全屏期间保留播放器字幕、控制栏、设置菜单和原生全屏功能。退出原生全屏后会恢复网页全屏状态。
+- `chrome://` 内部页面；
+- Chrome Web Store；
+- 部分浏览器内置页面；
+- 其他扩展页面。
 
-## 文件结构
+跨域 `iframe` 可以将整个 iframe 外框铺满视口，但扩展不会读取其内部 DOM。部分网站使用特殊布局、关闭的 Shadow DOM 或持续重建组件，可能需要单独兼容。
 
-- `manifest.json`：扩展入口、版本、商店名称和注入范围。
-- `content.js`：页面识别、播放器选择、按钮管理、网页全屏状态、DOM 观察器和生命周期。
-- `content.css`：遮罩、播放器视口布局和按钮尺寸同步。
-- `PRIVACY.md`：公开隐私政策。
-- `STORE.md`：Chrome Web Store 文案、审核字段和发布清单。
-- `assets/icon-source.svg`：原创图标源稿，不直接用于 manifest。
-- `scripts/build-store-package.ps1`：生成 PNG 图标、宣传图和商店 ZIP。
+## 验证重点
 
-`content.js` 保持单文件和零依赖，按“常量、运行状态、播放器识别、网页全屏布局、按钮、观察器、状态同步、生命周期、启动入口”分区。所有可变运行状态集中在 `state` 对象中，便于统一清理和后续维护。
+- 视频、图片、文章正文、在线文档、Canvas、跨域 iframe；
+- 选中子元素后使用 `↑` 切换到父容器；
+- `Esc`、再次点击扩展图标、页面刷新后的恢复；
+- 进入后调整窗口大小、最大化和还原；
+- 浏览器缩放 80%、100%、125% 和 150%；
+- YouTube 普通视频、Shorts、播放列表、直播及站内换片。
 
-## 安全与性能
-
-扩展不解析视频地址、不读取网络请求、不访问第三方服务，不申请额外 Chrome API 权限，只在 `https://www.youtube.com/*` 注入本地 `content.js` 和 `content.css`。
-
-找到播放器后只观察播放器控制栏区域；播放器暂时不存在时才启用页面发现观察器。另有每 5 秒一次的低频健康检查，用于处理 YouTube 控件重建和站内导航。
+## 隐私
 
 完整隐私说明见 [PRIVACY.md](./PRIVACY.md)。
-
-## Chrome Web Store 发布包
-
-仅在需要制作商店发布包时，在当前目录执行：
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-store-package.ps1
-```
-
-脚本使用 Windows 自带的 Windows PowerShell，不要求安装 PowerShell 7。它会生成 PNG 扩展图标、128×128 商店图标、440×280 小型宣传图，并把图标配置写入临时发布 manifest。输出位置：
-
-```text
-.store-build/viewport-fullscreen-for-youtube-v<版本号>.zip
-.store-build/package/
-.store-build/store-assets/
-```
-
-源目录不会写入二进制图标或构建产物。真实运行截图仍需人工截取；商店说明、截图要求、隐私字段和提交检查见 [STORE.md](./STORE.md)。
-
-## 回归检查
-
-发布或修改选择器后，至少检查以下场景：
-
-- 普通视频、播放列表、直播、广告和 Shorts。
-- 宽窗口进入网页全屏后连续收窄、放宽、最大化和还原。
-- 站内切换视频和自动播放下一条。
-- 网页全屏进入原生全屏，再退出原生全屏。
-- 设置菜单或右键菜单打开时按 `Esc`。
-- 切换标签页后返回。
-- 浏览器缩放 80%、100%、125% 和 150%。
-- 字幕、画质菜单、暂停和继续播放。
-- 页面刷新和扩展重新加载。
-
-## 维护说明
-
-YouTube DOM 不是公开稳定接口。当前实现以 `/watch`、`/shorts/`、`#movie_player`、`.ytp-right-controls` 和 `.ytp-fullscreen-button` 为主要定位点。普通视频优先选择 `ytd-watch-flexy` 中的播放器；Shorts 结合播放状态、活动 renderer、可见面积和视口中心距离选择当前播放器。按钮与原生全屏按钮插入同一父节点，并同步其实际宽高。
-
-`data-yt-webpage-fullscreen-sibling` 仅用于清理 `1.2.0` 遗留标记，可在后续确认不再需要兼容旧页面后删除。
-
-## 商标声明
-
-YouTube is a trademark of Google LLC. This extension is not affiliated with or endorsed by Google LLC.
