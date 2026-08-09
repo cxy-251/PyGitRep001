@@ -56,18 +56,16 @@
 # @lc code=start
 class Solution:
     def lengthOfLongestSubstring(self, s: str) -> int:
-    
-        # 还以为是最长回文字串
-        char_set = set()
-        left = 0
-        max_length = 0
+        char_set = set()  # 用于存储当前窗口中的字符
+        left = 0  # 左指针，表示窗口的起始位置
+        max_length = 0  # 记录最长子串的长度
 
-        for right in range(len(s)):
-            while s[right] in char_set:
-                char_set.remove(s[left])
-                left += 1
-            char_set.add(s[right])
-            max_length = max(max_length, right - left + 1)
+        for right in range(len(s)):  # 右指针，表示窗口的结束位置
+            while s[right] in char_set:  # 如果右指针指向的字符在窗口中已存在
+                char_set.remove(s[left])  # 移除左指针指向的字符
+                left += 1  # 左指针右移，缩小窗口
+            char_set.add(s[right])  # 将右指针指向的字符加入窗口
+            max_length = max(max_length, right - left + 1)  # 更新最长子串长度
 
         return max_length
 
