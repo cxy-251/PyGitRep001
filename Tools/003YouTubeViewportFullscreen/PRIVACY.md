@@ -1,17 +1,17 @@
 # 隐私政策 / Privacy Policy
 
-最后更新 / Last updated: 2026-08-04
+最后更新 / Last updated: 2026-09-03
 
 ## 中文
 
-本政策适用于 Chrome 扩展“网页视口全屏助手”。
+本政策适用于 Chrome 扩展「网页视口全屏助手 for YouTube」。
 
-扩展具有两种运行方式：
+扩展只在 `https://www.youtube.com/*` 页面上作为 content script 自动运行，用于：
 
-- YouTube 页面会加载本地专用脚本，用于提供播放器控制栏中的网页全屏按钮；
-- 其他普通网页只有在用户点击扩展图标时，才通过 `activeTab` 临时注入本地元素选择脚本。
+- 在播放器控制栏插入网页全屏与单视频循环按钮；
+- 在频道视频页插入「全部播放」按钮。
 
-为了实现功能，扩展会在当前标签页本地读取目标元素及其祖先 DOM、尺寸、可见状态、滚动位置和焦点状态。这些信息仅用于选择目标、调整布局以及退出时恢复页面。
+为了实现这些功能，扩展会在当前页面本地读取播放器及其祖先 DOM、元素尺寸、可见状态、滚动位置和焦点状态。这些信息仅用于插入按钮、铺满播放器布局，以及退出时恢复页面。
 
 扩展不会：
 
@@ -19,9 +19,10 @@
 - 读取 Cookie、认证信息或网络请求；
 - 使用分析、广告、跟踪或遥测服务；
 - 向开发者或第三方发送数据；
-- 加载或执行远程代码。
+- 加载或执行远程代码；
+- 在任何非 YouTube 页面运行（清单中不申请任何 host 之外的主机权限，也没有后台脚本或 `activeTab`/`scripting` 权限）。
 
-扩展申请 `activeTab` 和 `scripting` 权限，仅用于响应用户点击，在当前普通 HTTP/HTTPS 标签页中临时注入扩展自带的 JavaScript 和 CSS。扩展没有后台服务器，不持久化网页内容；运行状态在页面刷新或关闭后清除。
+扩展没有后台服务器，不持久化网页内容；运行状态在页面刷新或关闭后清除。
 
 联系与支持：
 
@@ -33,24 +34,25 @@ YouTube is a trademark of Google LLC. This extension is not affiliated with or e
 
 ## English
 
-This policy applies to the Chrome extension “Viewport Fullscreen Assistant”.
+This policy applies to the Chrome extension “Viewport Fullscreen Assistant for YouTube”.
 
-The extension has two operating modes:
+The extension runs automatically as a content script only on `https://www.youtube.com/*` pages to:
 
-- A local YouTube-specific script provides the viewport-fullscreen button inside the player controls;
-- On other regular webpages, the generic element picker is injected temporarily only after the user clicks the extension action, using the `activeTab` permission.
+- Add viewport-fullscreen and single-video-loop buttons to the player controls;
+- Add a “play all” button on channel video pages.
 
-To provide the feature, the extension locally reads the selected element and ancestor DOM, element dimensions and visibility, scroll position, and focus state. This information is used only to select the target, adjust its layout, and restore the page on exit.
+To provide these features, the extension locally reads the active player and its ancestor DOM, element dimensions, visibility, scroll position, and focus state. This information is used only to insert buttons, expand the player layout, and restore the page on exit.
 
 The extension does not:
 
 - Collect, store, or upload browsing history, account information, searches, or webpage content;
-- Read cookies, authentication data, or network requests;
+- Read cookies, credentials, or network requests;
 - Use analytics, advertising, tracking, or telemetry services;
 - Send data to the developer or third parties;
-- Load or execute remote code.
+- Load or execute remote code;
+- Run on any non-YouTube page (the manifest declares no host access beyond the YouTube content script, and no background script or `activeTab`/`scripting` permission).
 
-The `activeTab` and `scripting` permissions are used only in response to an explicit user action to inject bundled JavaScript and CSS into the current regular HTTP/HTTPS tab. The extension has no backend server and does not persist webpage content. Runtime state is cleared when the page is refreshed or closed.
+The extension has no backend server and does not persist webpage content. Runtime state is cleared when the page is refreshed or closed.
 
 Contact and support:
 

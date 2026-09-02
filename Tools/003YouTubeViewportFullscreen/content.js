@@ -1,3 +1,14 @@
+/*
+ * YouTube 专用逻辑（content script，随页面自动注入，配套样式见 content.css）。
+ *
+ * 提供三项功能：
+ *  1. 播放器网页全屏 —— 点击控制栏按钮，用 CSS 把当前播放器铺满视口，保留
+ *     标签栏/地址栏；期间会把播放器临时挂到 body 顶层，规避 YouTube 宽屏重排
+ *     造成的层叠/裁剪问题，退出时放回原位。
+ *  2. 单视频循环 —— 控制栏循环按钮，开启后当前视频播完自动重播。
+ *  3. 频道“全部播放” —— 频道视频页排序行旁一个按钮，把当前排序下已加载的
+ *     可见视频制成播放列表（前 50 个）。
+ */
 (() => {
   "use strict";
 
@@ -22,13 +33,15 @@
   });
 
   const ENTER_ICON = `
-    <svg viewBox="0 0 36 36" aria-hidden="true" focusable="false">
-      <path d="M7 7h9v3h-6v6H7V7Zm13 0h9v9h-3v-6h-6V7ZM7 20h3v6h6v3H7v-9Zm19 0h3v9h-9v-3h6v-6Z"/>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path style="fill:none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/>
     </svg>`;
 
   const EXIT_ICON = `
-    <svg viewBox="0 0 36 36" aria-hidden="true" focusable="false">
-      <path d="M7 15v-3h5V7h3v8H7Zm14 0V7h3v5h5v3h-8ZM7 21h8v8h-3v-5H7v-3Zm14 0h8v3h-5v5h-3v-8Z"/>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path style="fill:none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        d="M3 9h6V3M21 9h-6V3M3 15h6v6M21 15h-6v6"/>
     </svg>`;
 
   // ---------- 运行状态 ----------
@@ -194,8 +207,25 @@
       ));
   }
 
-  function clearViewportLayout({ removeBackdrop = true } = {}) {
-    state.viewport.player?.removeAttribute(PLAYER_ATTRIBUTE);
+  function clearViewportLayout({ removeBackdrop = true, restorePlayer = true } = {}) {
+    const player = state.viewport.player;
+    if (player) {
+      player.removeAttribute(PLAYER_ATTRIBUTE);
+    }
+
+    // 若全屏期间把播放器挪到了 body 顶层，退出时放回原位
+    if (restorePlayer && state.viewport.home) {
+      const home = state.viewport.home;
+      const target = home.parent && home.parent.isConnected ? home.parent : null;
+      if (target) {
+        if (home.nextSibling && home.nextSibling.isConnected) {
+          target.insertBefore(player, home.nextSibling);
+        } else {
+          target.appendChild(player);
+        }
+      }
+    }
+    state.viewport.home = null;
 
     for (const element of state.viewport.ancestors) {
       element.removeAttribute(ANCESTOR_ATTRIBUTE);
@@ -205,8 +235,22 @@
     if (removeBackdrop) document.getElementById(BACKDROP_ID)?.remove();
   }
 
+
   function applyViewportLayout(player) {
     clearViewportLayout({ removeBackdrop: false });
+
+    // 全屏期间把播放器挪到 body 顶层（记住原位），摆脱宽屏祖先层叠/裁剪，
+    // 确保它始终压在黑色遮罩之上，避免黑屏。
+    if (player.parentElement !== document.body) {
+      if (!state.viewport.home) {
+        state.viewport.home = {
+          parent: player.parentElement,
+          nextSibling: player.nextSibling
+        };
+      }
+      document.body.appendChild(player);
+    }
+
     state.viewport.player = player;
     state.viewport.player.setAttribute(PLAYER_ATTRIBUTE, "true");
 
@@ -217,6 +261,7 @@
 
     ensureBackdrop();
   }
+
 
   function requestPlayerResize() {
     requestAnimationFrame(() => {
@@ -294,8 +339,10 @@
 
     syncButtonMetrics(button, nativeButton);
     updateViewportButton();
+    ensureLoopButtons(player, parent, nativeButton);
     return true;
   }
+
 
   // ---------- DOM 观察器 ----------
 
@@ -383,7 +430,15 @@
     }
 
     state.missingPlayerSince = 0;
-    stopDiscoveryObserver();
+    // stopDiscoveryObserver();
+
+    // 网页全屏期间持续监听页面结构：YouTube 重排/重建 #movie_player 时会丢掉
+    // 我们打的属性，若不监听就停在黑屏，直到下次 resize 或 5s 心跳才恢复。
+    if (state.viewport.active) {
+      startDiscoveryObserver();
+    } else {
+      stopDiscoveryObserver();
+    }
 
     if (state.viewport.active && !isViewportLayoutCurrent(player)) {
       applyViewportLayout(player);
@@ -398,16 +453,38 @@
     state.timers.runtimeSync = window.setTimeout(syncRuntimeState, delay);
   }
 
+  // function scheduleViewportLayoutRefresh() {
+  //   window.clearTimeout(state.timers.viewportRefresh);
+  //   state.timers.viewportRefresh = window.setTimeout(() => {
+  //     const player = findBestPlayer();
+  //     if (state.viewport.active && player) {
+  //       applyViewportLayout(player);
+  //       requestPlayerResize();
+  //     }
+  //     syncRuntimeState();
+  //   }, TIMING.viewportDelay);
+  // }
+  //
   function scheduleViewportLayoutRefresh() {
     window.clearTimeout(state.timers.viewportRefresh);
-    state.timers.viewportRefresh = window.setTimeout(() => {
-      const player = findBestPlayer();
-      if (state.viewport.active && player) {
-        applyViewportLayout(player);
+
+    // YouTube 响应式重排是异步分多步的，窗口一变要多等几个节点再补一次，
+    // 否则它重排完会把我们刚打的标记覆盖，导致黑屏。
+    const delays = [TIMING.viewportDelay, 260, 520, 900, 1500];
+    delays.forEach((delay) => {
+      state.timers.viewportRefresh = window.setTimeout(() => {
+        if (!state.viewport.active) return;
+        const player = findBestPlayer();
+        if (!player) return;
+        if (!isViewportLayoutCurrent(player)) applyViewportLayout(player);
         requestPlayerResize();
-      }
-      syncRuntimeState();
-    }, TIMING.viewportDelay);
+      }, delay);
+    });
+
+    // 最后一轮后再做一次完整状态同步
+    state.timers.viewportRefresh = window.setTimeout(() => {
+      if (state.viewport.active) syncRuntimeState();
+    }, 1900);
   }
 
   function startHealthCheck() {
@@ -552,20 +629,243 @@
     clearLegacyMarkers();
   }
 
+  // ---------- 播放器控制栏单视频循环功能 ----------
+
+  const SINGLE_LOOP_BUTTON_ID = "yt-single-loop-button";
+
+  const SINGLE_LOOP_ICON = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path style="fill:none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        d="M7 7h9a5 5 0 1 1 0 10H6M9 4 6 7l3 3M17 17H8a5 5 0 1 1 0-10h10M15 20l3-3-3-3"/>
+    </svg>`;
+
+  let isSingleLoopActive = false;
+
+  function toggleSingleLoop(player) {
+    isSingleLoopActive = !isSingleLoopActive;
+    const video = player?.querySelector("video") || document.querySelector("video");
+    if (video) {
+      video.loop = isSingleLoopActive;
+    }
+    updateLoopButtonsState(player);
+  }
+
+  function updateLoopButtonsState(player) {
+    const singleBtn = document.getElementById(SINGLE_LOOP_BUTTON_ID);
+    if (singleBtn) {
+      singleBtn.classList.toggle("yt-loop-active", isSingleLoopActive);
+      singleBtn.title = isSingleLoopActive ? "单视频循环播放: 已开启" : "单视频循环播放: 已关闭";
+      singleBtn.setAttribute("aria-label", singleBtn.title);
+    }
+  }
+
+  function ensureLoopButtons(player, parent, nativeButton) {
+    if (!parent || !nativeButton || !parent.isConnected) return;
+
+    let singleBtn = document.getElementById(SINGLE_LOOP_BUTTON_ID);
+    if (!singleBtn || singleBtn.parentElement !== parent) {
+      singleBtn?.remove();
+      singleBtn = document.createElement("button");
+      singleBtn.id = SINGLE_LOOP_BUTTON_ID;
+      singleBtn.type = "button";
+      const nativeClasses = Array.from(nativeButton.classList).filter((c) => c !== "ytp-fullscreen-button");
+      singleBtn.className = nativeClasses.join(" ");
+      singleBtn.classList.add("ytp-button");
+      singleBtn.innerHTML = SINGLE_LOOP_ICON;
+      singleBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSingleLoop(player);
+      });
+      parent.insertBefore(singleBtn, nativeButton);
+    }
+    syncButtonMetrics(singleBtn, nativeButton);
+
+    const video = player?.querySelector("video") || document.querySelector("video");
+    if (video && !video.hasAttribute("data-yt-loop-bound")) {
+      video.setAttribute("data-yt-loop-bound", "true");
+      video.addEventListener("ended", () => {
+        if (isSingleLoopActive) {
+          video.currentTime = 0;
+          video.play().catch(() => {});
+        }
+      });
+    }
+
+    updateLoopButtonsState(player);
+  }
+
+  // ---------- 频道视频页全部播放功能 ----------
+
+  const CHANNEL_PLAY_ALL_BUTTON_ID = "yt-channel-play-all-button";
+  const PLAY_ICON = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M8 5v14l11-7z"/>
+    </svg>`;
+
+  function isChannelVideosPage() {
+    return (
+      location.pathname.includes("/videos") ||
+      location.pathname.endsWith("/videos") ||
+      Boolean(document.querySelector("ytd-browse[page-subtype='channels'] ytd-feed-filter-chip-bar-renderer"))
+    );
+  }
+
+  function getActiveFilterLabel() {
+    // 新版频道排序行：chip-bar-view-model 内高亮的 tab
+    const row = document.querySelector("ytd-rich-grid-renderer chip-bar-view-model");
+    const tab = row && row.querySelector('button[role="tab"][aria-selected="true"]');
+    if (tab) {
+      const text = tab.textContent.trim();
+      if (text) return text;
+    }
+    // 旧版频道排序行：yt-chip-cloud-chip-renderer
+    const oldChip = document.querySelector(
+      "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer[selected], " +
+      "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer[aria-selected='true'], " +
+      "iron-selector#chips yt-chip-cloud-chip-renderer[selected]"
+    );
+    if (oldChip) {
+      const text = oldChip.textContent.trim();
+      if (text) return text;
+    }
+    return "当前列表";
+  }
+
+  function extractVisibleVideoIds() {
+    const allLinks = Array.from(
+      document.querySelectorAll("ytd-browse[page-subtype='channels'] a, ytd-rich-grid-renderer a, ytd-two-column-browse-results-renderer a, #primary a, a#video-title-link, a#thumbnail, a")
+    );
+
+    const videoIds = [];
+    for (const link of allLinks) {
+      if (link.closest("#masthead, #guide, #mini-guide, ytd-guide-renderer, ytd-mini-guide-renderer")) {
+        continue;
+      }
+
+      const href = link.getAttribute("href") || link.href;
+      if (!href) continue;
+
+      let id = null;
+      const watchMatch = href.match(/[?&]v=([^&]+)/);
+      if (watchMatch && watchMatch[1]) {
+        id = watchMatch[1];
+      } else {
+        const shortsMatch = href.match(/\/shorts\/([^/?&#]+)/);
+        if (shortsMatch && shortsMatch[1]) {
+          id = shortsMatch[1];
+        }
+      }
+
+      if (id && !videoIds.includes(id)) {
+        videoIds.push(id);
+      }
+    }
+
+    return videoIds;
+  }
+
+  function handlePlayAllClick(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const videoIds = extractVisibleVideoIds();
+    if (videoIds.length === 0) {
+      alert("未在当前页面检测到视频，请等待列表加载或向下滚动加载更多视频后再试！");
+      return;
+    }
+
+    const targetIds = videoIds.slice(0, 50).join(",");
+    window.location.href = `https://www.youtube.com/watch_videos?video_ids=${targetIds}`;
+  }
+
+  // 定位频道视频页的排序行容器（兼容新版 chip-bar 与旧版 feed-filter-chip-bar）
+  function getChannelChipRow() {
+    return (
+      document.querySelector("ytd-rich-grid-renderer chip-bar-view-model") ||
+      document.querySelector("ytd-feed-filter-chip-bar-renderer")
+    );
+  }
+
+  // 排序行里的"胶囊"项（新版为 chip wrapper，旧版为 chip-renderer）
+  function getChannelChipItems(row) {
+    if (!row) return [];
+    return Array.from(
+      row.querySelectorAll(".ytChipBarViewModelChipWrapper, yt-chip-cloud-chip-renderer")
+    );
+  }
+
+  function ensureChannelPlayAllButton() {
+    if (!isChannelVideosPage()) {
+      const b = document.getElementById(CHANNEL_PLAY_ALL_BUTTON_ID);
+      if (b) b.remove();
+      return;
+    }
+
+    const row = getChannelChipRow();
+    const items = getChannelChipItems(row);
+    // 排序行还没渲染出来时先不动，等下一次轮询
+    if (items.length === 0) {
+      const b = document.getElementById(CHANNEL_PLAY_ALL_BUTTON_ID);
+      if (b) b.remove();
+      return;
+    }
+
+    const lastChip = items[items.length - 1];
+    let button = document.getElementById(CHANNEL_PLAY_ALL_BUTTON_ID);
+
+    if (!button) {
+      button = document.createElement("button");
+      button.id = CHANNEL_PLAY_ALL_BUTTON_ID;
+      button.type = "button";
+      button.innerHTML = PLAY_ICON;
+      button.addEventListener("click", handlePlayAllClick);
+    }
+
+    // 位置不对时插到最后一个胶囊右侧（随胶囊一起排布）
+    const isPlaced = button.isConnected && button.previousElementSibling === lastChip;
+    if (!isPlaced) {
+      lastChip.after(button);
+    }
+
+    const filterName = getActiveFilterLabel();
+    const tooltip = `全部播放当前列表 (${filterName}，前50部)`;
+    if (button.title !== tooltip) {
+      button.title = tooltip;
+      button.setAttribute("aria-label", tooltip);
+    }
+  }
+
   function registerEventListeners() {
     document.addEventListener("keydown", handleKeydown, true);
     document.addEventListener("fullscreenchange", syncNativeFullscreenState);
     document.addEventListener("yt-navigate-start", handleNavigationStart);
     document.addEventListener("yt-navigate-finish", () => {
       scheduleRuntimeSync(TIMING.navigationDelay);
+      setTimeout(ensureChannelPlayAllButton, 200);
+      setTimeout(ensureChannelPlayAllButton, 600);
+      setTimeout(ensureChannelPlayAllButton, 1200);
+      setTimeout(ensureChannelPlayAllButton, 2500);
     });
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     window.addEventListener("resize", handleWindowResize);
     window.addEventListener("popstate", () => {
       scheduleRuntimeSync(TIMING.popstateDelay);
+      setTimeout(ensureChannelPlayAllButton, 200);
+      setTimeout(ensureChannelPlayAllButton, 800);
     });
     window.addEventListener("pagehide", handlePageHide, { once: true });
+
+    document.addEventListener("click", (e) => {
+      if (e.target && e.target.closest("yt-chip-cloud-chip-renderer, ytd-tab-renderer")) {
+        setTimeout(ensureChannelPlayAllButton, 200);
+        setTimeout(ensureChannelPlayAllButton, 600);
+        setTimeout(ensureChannelPlayAllButton, 1200);
+      }
+    }, true);
   }
 
   // ---------- 启动 ----------
@@ -575,6 +875,7 @@
     registerEventListeners();
     startHealthCheck();
     syncRuntimeState();
+    setInterval(ensureChannelPlayAllButton, 500);
   }
 
   initialize();

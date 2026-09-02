@@ -1,26 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "网页视口全屏助手",
+  "name": "网页视口全屏助手 for YouTube",
   "short_name": "视口全屏助手",
-  "version": "2.0.0",
-  "description": "将任意网页中的视频、图片、文档或选定区域铺满浏览器内容区，同时保留标签栏和地址栏。",
+  "version": "1.0",
+  "description": "在 YouTube 播放器控制栏加入“网页全屏”和“单视频循环”按钮，并在频道视频页提供把当前排序列表一键制成播放列表的按钮。",
   "homepage_url": "https://github.com/cxy-251/PyGitRep001/tree/main/Tools/003YouTubeViewportFullscreen",
   "minimum_chrome_version": "120",
-  "permissions": [
-    "activeTab",
-    "scripting"
-  ],
-  "background": {
-    "service_worker": "service-worker.js"
-  },
-  "action": {
-    "default_title": "选择网页区域并铺满视口"
-  },
-  "commands": {
-    "_execute_action": {
-      "description": "选择网页区域并铺满视口"
-    }
-  },
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
